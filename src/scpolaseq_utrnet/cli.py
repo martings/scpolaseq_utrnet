@@ -41,6 +41,11 @@ def main(argv: list[str] | None = None) -> int:
     cerna_item.add_argument("--top-n", type=int, default=15, help="number of top robust genes")
     cerna_item.add_argument("--genes", nargs="+", help="explicit list of gene symbols")
     cerna_item.add_argument("--output", help="output directory for ceRNA network")
+
+    traj_item = sub.add_parser("trajectory")
+    traj_item.add_argument("--config", required=True)
+    traj_item.add_argument("--gene", help="gene symbol or Ensembl base ID")
+    traj_item.add_argument("--order", nargs="+", required=True, help="ordered list of population states")
     args = parser.parse_args(argv)
     config = load_config(args.config)
     if getattr(args, "gene", None):
@@ -108,6 +113,12 @@ def main(argv: list[str] | None = None) -> int:
         from .cerna import export_cerna_analysis
         out_dir = Path(args.output).resolve() if getattr(args, "output", None) else None
         res = export_cerna_analysis(config, genes=getattr(args, "genes", None), top_n=args.top_n, output_dir=out_dir)
+        print(json.dumps({k: str(v) for k, v in res.items()}, indent=2))
+        return 0
+    if args.command == "trajectory":
+        from .dynamics import export_trajectory_analysis
+        directory = _gene_directory(config)
+        res = export_trajectory_analysis(directory, args.order)
         print(json.dumps({k: str(v) for k, v in res.items()}, indent=2))
         return 0
     return 1

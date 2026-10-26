@@ -68,9 +68,15 @@ def render_gene(directory: Path) -> tuple[Path, Path]:
     graph_files = sorted((directory / "graphs").glob("*.graphml"))
     network_fig = go.Figure()
     graph_names = []
-    kind_colors = {"population": "#111827", "gene": "#2563eb", "PAS": "#f59e0b",
-                   "UTR_isoform": "#10b981", "regulatory_region": "#e11d48",
-                   "ARE-BP": "#7c3aed", "miRNA": "#9333ea"}
+    kind_colors = {
+        "population": "#111827", "gene": "#2563eb", "PAS": "#f59e0b",
+        "UTR_isoform": "#10b981", "regulatory_region": "#e11d48",
+        "ARE-BP": "#7c3aed", "miRNA": "#9333ea", "cpa_factor": "#059669",
+        "PUF": "#d97706", "CPEB": "#dc2626", "KH_domain": "#0284c7",
+        "RRM": "#4f46e5", "STAR": "#0891b2", "Zinc_finger": "#ec4899",
+        "hnRNP": "#8b5cf6", "SR_protein": "#06b6d4", "CFIm": "#059669",
+        "CSTF": "#16a34a", "CPSF": "#15803d", "PAB": "#047857"
+    }
     for file in graph_files:
         graph = nx.read_graphml(file)
         label = graph.graph.get("population", file.stem)
@@ -116,11 +122,45 @@ def render_gene(directory: Path) -> tuple[Path, Path]:
                          "evidence_tier", "accessibility_status", "abundance_source",
                          "interaction_score", "score_ci_low", "score_ci_high", "score_status",
                          "population_coverage_status"]].to_html(index=False, escape=True) if not scores.empty else "<p>No candidate motif interactions for this gene.</p>"
+    cpa_section = ""
+    cpa_path = directory / "cpa_correlations.csv"
+    if cpa_path.exists():
+        try:
+            cpa_df = pd.read_csv(cpa_path)
+            sig_cpa = cpa_df[(cpa_df.spearman_p <= 0.1) & (cpa_df.spearman_r.abs() >= 0.35)].sort_values("spearman_p")
+            if not sig_cpa.empty:
+                cpa_section = (
+                    "<h2>Maquinaria CPA & Splicing-APA Regulatory Factors</h2>"
+                    "<p>Correlaciones significativas entre expresión de factores CPA y selección de PAS / SI (Spearman |r| >= 0.35, p <= 0.1).</p>"
+                    "<div style='overflow:auto;max-height:350px'>" +
+                    sig_cpa[["factor", "complex", "target_type", "target_id", "spearman_r", "spearman_p", "prior_effect", "pmid"]].to_html(index=False, escape=True) +
+                    "</div>"
+                )
+        except Exception:
+            pass
+
+    apafield_section = ""
+    apafield_path = directory / "apafield_metrics.csv"
+    if apafield_path.exists():
+        try:
+            apa_df = pd.read_csv(apafield_path)
+            if not apa_df.empty:
+                apafield_section = (
+                    "<h2>Propiedades Físicas Apafield (Base Fija)</h2>"
+                    "<p>Índice de Acortamiento (SI) y Magnetización Genómica por población celular.</p>"
+                    "<div style='overflow:auto;max-height:350px'>" +
+                    apa_df.to_html(index=False, escape=True) +
+                    "</div>"
+                )
+        except Exception:
+            pass
+
     html.write_text("<!doctype html><html><head><meta charset='utf-8'><title>UTRNet explorer</title>"
                     "<style>body{font-family:system-ui,sans-serif;max-width:1500px;margin:auto;padding:24px}"
                     "table{border-collapse:collapse;font-size:12px}th,td{padding:5px;border:1px solid #ddd}</style>"
                     "</head><body>" + note + fig.to_html(full_html=False, include_plotlyjs=True) +
                     network_fig.to_html(full_html=False, include_plotlyjs=False) +
+                    apafield_section + cpa_section +
                     "<h2>Site retention across candidate PAS models</h2><div style='overflow:auto;max-height:350px'>" +
                     retention.to_html(index=False, escape=True) + "</div>" +
                     "<h2>Decomposed candidate interactions</h2><div style='overflow:auto;max-height:500px'>" +
