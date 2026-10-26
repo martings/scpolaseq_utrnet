@@ -1,0 +1,16 @@
+contract: utrnet-input/v0.1
+sample_id: pbmc_1k_v3
+gene: SAT1
+upstream: ${UTRNET_UPSTREAM}
+downstream: ${UTRNET_DOWNSTREAM}
+output: ../outputs/pbmc1k
+min_population_cells: 15
+min_pas_umi: 5
+max_utr_span: 50000
+fold_window: 80
+fold_span: 40
+fold_unpaired: 5
+resources:
+  motifs: ../resources/are_motifs.tsv
+  mirna: null
+  mirna_seeds: ../resources/mirgenedb3_hsa_mature.fa

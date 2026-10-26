@@ -1,0 +1,3 @@
+motif_id	regulator	regulator_class	pattern	evidence_tier	source	version	url	pubmed_id	assay	cell_context	matrix_id
+ATtRACT_1103_ELAVL1_AUUUA	ELAVL1	ARE-BP	AUUUA	experimental_other_context	ATtRACT	2016-09-27	https://attract.cnic.es/download	9882309	UV cross-linking;EMSA	HeLa nuclear extracts and recombinant protein	1103
+ATtRACT_38_ZFP36_AUUUA	ZFP36	ARE-BP	AUUUA	experimental_other_context	ATtRACT	2016-09-27	https://attract.cnic.es/download	18256032	genome-wide in vivo immunoprecipitation	other or unspecified context	38
