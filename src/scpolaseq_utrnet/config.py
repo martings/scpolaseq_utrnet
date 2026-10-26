@@ -29,6 +29,14 @@ class Config:
         return self.downstream / "cell_labels/adata_celltyped.h5ad"
 
     @property
+    def apa_priority_table(self) -> Path:
+        return self.downstream / "apa/celltype_specific_APA_priority_table.tsv"
+
+    @property
+    def si_magnetization_table(self) -> Path:
+        return self.downstream / "apa/si_and_magnetization_by_celltype.tsv"
+
+    @property
     def reference_fasta(self) -> Path:
         return self.upstream / "reference/reference.genome.fa"
 
@@ -40,8 +48,8 @@ class Config:
 def load_config(path: str | Path) -> Config:
     p = Path(path).expanduser().resolve()
     data = yaml.safe_load(p.read_text())
-    if data.get("contract") != "utrnet-input/v0.1":
-        raise ValueError("config contract must be utrnet-input/v0.1")
+    if data.get("contract") not in {"utrnet-input/v0.1", "utrnet-input/v0.2"}:
+        raise ValueError("config contract must be utrnet-input/v0.1 or utrnet-input/v0.2")
 
     def locate(key: str, fallback: str | None = None) -> Path:
         configured = str(data.get(key, fallback))

@@ -55,7 +55,7 @@ def build_gene_graphs(config: Config) -> dict[str, Path]:
                                 abundance, config.min_population_cells)
     scores.to_csv(directory / "interaction_scores.csv", index=False)
     population_metrics(scores).to_csv(directory / "population_metrics.csv", index=False)
-    rewiring = compare_populations(scores)
+    rewiring = compare_populations(scores, priority_df=tables.get("apa_priority"))
     rewiring.to_csv(directory / "rewiring.csv", index=False)
     export_graphs(scores, tables["apa_profiles"], isoforms, regulatory_sites, directory / "graphs")
     sources = [config.curated_h5ad, config.upstream / "pas_reference/pas_reference.tsv",
@@ -66,7 +66,11 @@ def build_gene_graphs(config: Config) -> dict[str, Path]:
         sources.append(config.mirna_resource)
     if config.mirna_seed_resource:
         sources.append(config.mirna_seed_resource)
-    metadata = {"contract": "utrnet-input/v0.1", "model": "utrnet-v0.1",
+    if config.apa_priority_table.exists():
+        sources.append(config.apa_priority_table)
+    if config.si_magnetization_table.exists():
+        sources.append(config.si_magnetization_table)
+    metadata = {"contract": "utrnet-input/v0.2", "model": "utrnet-v0.2",
                 "sample_id": config.sample_id, "gene_id": gene_id,
                 "source_execution": str(config.upstream), "sources": [_fingerprint(p) for p in sources],
                 "folding_parameters": {"window": config.fold_window, "span": config.fold_span,

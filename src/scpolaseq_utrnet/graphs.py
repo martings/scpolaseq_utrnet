@@ -114,7 +114,7 @@ def score_interactions(profiles: pd.DataFrame, isoforms: pd.DataFrame,
 
 def build_graph(scores: pd.DataFrame, profiles: pd.DataFrame, isoforms: pd.DataFrame,
                 regulatory_sites: pd.DataFrame, population: str) -> nx.MultiDiGraph:
-    graph = nx.MultiDiGraph(population=population, model="utrnet-v0.1")
+    graph = nx.MultiDiGraph(population=population, model="utrnet-v0.2")
     p = profiles[profiles.celltype_corrected == population]
     s = scores[scores.population == population]
     if p.empty:
@@ -122,7 +122,14 @@ def build_graph(scores: pd.DataFrame, profiles: pd.DataFrame, isoforms: pd.DataF
     gene = str(p.gene_id.iloc[0])
     pop_node = f"population:{population}"
     gene_node = f"gene:{gene}"
-    graph.add_node(pop_node, kind="population", label=population)
+    pop_attrs = {"kind": "population", "label": population}
+    if "si" in p.columns and pd.notna(p["si"].iloc[0]):
+        pop_attrs["shortening_index"] = float(p["si"].iloc[0])
+    if "magnetization_genomic" in p.columns and pd.notna(p["magnetization_genomic"].iloc[0]):
+        pop_attrs["magnetization_genomic"] = float(p["magnetization_genomic"].iloc[0])
+    if "entropy" in p.columns and pd.notna(p["entropy"].iloc[0]):
+        pop_attrs["entropy"] = float(p["entropy"].iloc[0])
+    graph.add_node(pop_node, **pop_attrs)
     graph.add_node(gene_node, kind="gene", label=gene)
     for row in p.itertuples(index=False):
         pas_id = f"pas:{row.site_id}"
@@ -149,7 +156,7 @@ def build_graph(scores: pd.DataFrame, profiles: pd.DataFrame, isoforms: pd.DataF
     return graph
 
 
-def compare_populations(scores: pd.DataFrame) -> pd.DataFrame:
+def compare_populations(scores: pd.DataFrame, priority_df: pd.DataFrame | None = None) -> pd.DataFrame:
     if scores.empty:
         return pd.DataFrame(columns=["population_a", "population_b", "regulator", "genomic_region",
                                      "score_a", "score_b", "delta_score", "availability_change"])
@@ -159,25 +166,46 @@ def compare_populations(scores: pd.DataFrame) -> pd.DataFrame:
         available=("relative_isoform_usage", lambda x: bool((x > 0).any())))
     populations = sorted(summary.population.unique())
     records = []
+
+    # Map priority comparisons if available
+    prio_lookup = {}
+    if priority_df is not None and not priority_df.empty:
+        for r in priority_df.itertuples(index=False):
+            key1 = (getattr(r, "group_a", None), getattr(r, "group_b", None))
+            key2 = (getattr(r, "group_b", None), getattr(r, "group_a", None))
+            prio_lookup[key1] = r
+            prio_lookup[key2] = r
+
     for i, a in enumerate(populations):
         for b in populations[i + 1:]:
             left = summary[summary.population == a].set_index(["regulator", "genomic_region"])
             right = summary[summary.population == b].set_index(["regulator", "genomic_region"])
+            prio_row = prio_lookup.get((a, b))
+
             for key in left.index.union(right.index):
                 la, rb = left.loc[key] if key in left.index else None, right.loc[key] if key in right.index else None
                 sa = float(la.interaction_score) if la is not None else 0.0
                 sb = float(rb.interaction_score) if rb is not None else 0.0
                 available_a = bool(la.available) if la is not None else False
                 available_b = bool(rb.available) if rb is not None else False
-                records.append({"population_a": a, "population_b": b, "regulator": key[0],
-                                "genomic_region": key[1], "score_a": sa, "score_b": sb,
-                                "delta_score": sb - sa,
-                                "delta_ci_low": (float(rb.score_ci_low) if rb is not None else 0.0) -
-                                                (float(la.score_ci_high) if la is not None else 0.0),
-                                "delta_ci_high": (float(rb.score_ci_high) if rb is not None else 0.0) -
-                                                 (float(la.score_ci_low) if la is not None else 0.0),
-                                "availability_change": "gained" if available_b and not available_a else
-                                "lost" if available_a and not available_b else "retained"})
+                rec = {
+                    "population_a": a, "population_b": b, "regulator": key[0],
+                    "genomic_region": key[1], "score_a": sa, "score_b": sb,
+                    "delta_score": sb - sa,
+                    "delta_ci_low": (float(rb.score_ci_low) if rb is not None else 0.0) -
+                                    (float(la.score_ci_high) if la is not None else 0.0),
+                    "delta_ci_high": (float(rb.score_ci_high) if rb is not None else 0.0) -
+                                     (float(la.score_ci_low) if la is not None else 0.0),
+                    "availability_change": "gained" if available_b and not available_a else
+                    "lost" if available_a and not available_b else "retained",
+                }
+                if prio_row is not None:
+                    rec["delta_m_genomic_fixed"] = getattr(prio_row, "delta_m_genomic_fixed", None)
+                    rec["delta_si"] = getattr(prio_row, "delta_si", None)
+                    rec["endpoint_artifact_suspect"] = getattr(prio_row, "endpoint_artifact_suspect", False)
+                    rec["is_robust"] = getattr(prio_row, "is_robust", False)
+                    rec["priority_score"] = getattr(prio_row, "priority_score", None)
+                records.append(rec)
     return pd.DataFrame(records)
 
 

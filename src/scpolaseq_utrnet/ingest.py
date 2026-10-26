@@ -138,6 +138,53 @@ def make_profiles(counts: pd.DataFrame, cells: pd.DataFrame, sites: pd.DataFrame
     return frame
 
 
+def ingest_apafield_metrics(config: Config, gene_id: str) -> pd.DataFrame:
+    """Ingest physical Apafield metrics (SI, magnetization, entropy) from downstream tables."""
+    cols = [
+        "celltype", "si", "magnetization_rank", "magnetization_genomic",
+        "entropy", "entropy_normalized", "polarization_rank", "polarization_genomic"
+    ]
+    si_path = config.si_magnetization_table
+    if not si_path.exists():
+        return pd.DataFrame(columns=cols)
+
+    base_id = _base(gene_id)
+    df = pd.read_csv(si_path, sep="\t")
+    filtered = df[df["gene_id_base"].astype(str).map(_base) == base_id].copy()
+    if filtered.empty and "gene_name" in df.columns:
+        filtered = df[df["gene_name"].astype(str).str.upper() == config.gene.upper()].copy()
+
+    if filtered.empty:
+        return pd.DataFrame(columns=cols)
+
+    present = [c for c in cols if c in filtered.columns]
+    return filtered[present].reset_index(drop=True)
+
+
+def ingest_apa_priority(config: Config, gene_id: str) -> pd.DataFrame:
+    """Ingest differential APA comparisons and priority rankings from downstream tables."""
+    cols = [
+        "comparison", "group_a", "group_b", "celltype", "delta_si",
+        "delta_m_genomic_fixed", "adj_p_value", "is_robust",
+        "priority_score", "endpoint_artifact_suspect"
+    ]
+    prio_path = config.apa_priority_table
+    if not prio_path.exists():
+        return pd.DataFrame(columns=cols)
+
+    base_id = _base(gene_id)
+    df = pd.read_csv(prio_path, sep="\t")
+    filtered = df[df["gene_id_base"].astype(str).map(_base) == base_id].copy()
+    if filtered.empty and "gene_name" in df.columns:
+        filtered = df[df["gene_name"].astype(str).str.upper() == config.gene.upper()].copy()
+
+    if filtered.empty:
+        return pd.DataFrame(columns=cols)
+
+    present = [c for c in cols if c in filtered.columns]
+    return filtered[present].reset_index(drop=True)
+
+
 def ingest_gene(config: Config) -> dict[str, pd.DataFrame]:
     cells, adata = load_cells(config)
     try:
@@ -149,8 +196,27 @@ def ingest_gene(config: Config) -> dict[str, pd.DataFrame]:
         adata.file.close()
     profiles = make_profiles(counts, cells, sites, gene_id)
     sites["gene_name"] = gene_name
-    return {"cells": cells, "pas_sites": sites, "pas_counts": counts,
-            "gene_expression": expression, "apa_profiles": profiles}
+
+    apafield = ingest_apafield_metrics(config, gene_id)
+    if not apafield.empty and "celltype" in apafield.columns:
+        merge_cols = [c for c in apafield.columns if c != "celltype"]
+        profiles = profiles.merge(
+            apafield, left_on="celltype_corrected", right_on="celltype", how="left"
+        )
+        if "celltype" in profiles.columns:
+            profiles = profiles.drop(columns=["celltype"])
+
+    priority = ingest_apa_priority(config, gene_id)
+
+    return {
+        "cells": cells,
+        "pas_sites": sites,
+        "pas_counts": counts,
+        "gene_expression": expression,
+        "apa_profiles": profiles,
+        "apafield_metrics": apafield,
+        "apa_priority": priority,
+    }
 
 
 def write_ingestion(tables: dict[str, pd.DataFrame], directory: Path) -> None:
