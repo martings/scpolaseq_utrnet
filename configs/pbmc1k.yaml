@@ -11,6 +11,6 @@ fold_window: 80
 fold_span: 40
 fold_unpaired: 5
 resources:
-  motifs: ../resources/are_motifs.tsv
+  motifs: ../resources/rbp_motifs_curated.tsv
   mirna: null
   mirna_seeds: ../resources/mirgenedb3_hsa_mature.fa
