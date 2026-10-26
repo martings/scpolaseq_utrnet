@@ -35,6 +35,12 @@ def main(argv: list[str] | None = None) -> int:
         if name == "sensitivity":
             item.add_argument("--dry-run", action="store_true")
             item.add_argument("--change", action="append", choices=sorted(PARAMETERS))
+
+    cerna_item = sub.add_parser("cerna")
+    cerna_item.add_argument("--config", required=True)
+    cerna_item.add_argument("--top-n", type=int, default=15, help="number of top robust genes")
+    cerna_item.add_argument("--genes", nargs="+", help="explicit list of gene symbols")
+    cerna_item.add_argument("--output", help="output directory for ceRNA network")
     args = parser.parse_args(argv)
     config = load_config(args.config)
     if getattr(args, "gene", None):
@@ -97,6 +103,12 @@ def main(argv: list[str] | None = None) -> int:
         target = directory / "sensitivity.csv"
         graph_sweep(scores, config.min_population_cells).to_csv(target, index=False)
         print(target)
+        return 0
+    if args.command == "cerna":
+        from .cerna import export_cerna_analysis
+        out_dir = Path(args.output).resolve() if getattr(args, "output", None) else None
+        res = export_cerna_analysis(config, genes=getattr(args, "genes", None), top_n=args.top_n, output_dir=out_dir)
+        print(json.dumps({k: str(v) for k, v in res.items()}, indent=2))
         return 0
     return 1
 
