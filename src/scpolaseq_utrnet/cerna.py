@@ -27,6 +27,8 @@ def get_top_prioritized_genes(config: Config, top_n: int = 15) -> list[str]:
     df = pd.read_csv(config.apa_priority_table, sep="\t")
     if "is_robust" in df.columns:
         df = df[df.is_robust.astype(bool)]
+    if "basis_span_bp" in df.columns:
+        df = df[df.basis_span_bp <= config.max_utr_span]
     if df.empty:
         return [config.gene]
 
@@ -80,7 +82,8 @@ def extract_gene_sites(
             gene_cfg.reference_fasta,
             max_span=gene_cfg.max_utr_span,
         )
-        if isoforms.empty:
+        if isoforms.empty or (isoforms.sequence_length <= 0).all():
+            logger.warning("Gene %s lacks valid compatible 3'UTR models; skipping from ceRNA cohort", gene)
             return pd.DataFrame(columns=["site_id", "regulator", "regulator_class", "motif_id"])
 
         sites = scan_motifs(isoforms, maps, tables["pas_sites"], gene_cfg.motif_resource)
