@@ -113,7 +113,9 @@ def score_interactions(profiles: pd.DataFrame, isoforms: pd.DataFrame,
 
 
 def build_graph(scores: pd.DataFrame, profiles: pd.DataFrame, isoforms: pd.DataFrame,
-                regulatory_sites: pd.DataFrame, population: str) -> nx.MultiDiGraph:
+                regulatory_sites: pd.DataFrame, population: str,
+                cpa_edges: pd.DataFrame | None = None,
+                cpa_expr: pd.DataFrame | None = None) -> nx.MultiDiGraph:
     graph = nx.MultiDiGraph(population=population, model="utrnet-v0.2")
     p = profiles[profiles.celltype_corrected == population]
     s = scores[scores.population == population]
@@ -153,6 +155,39 @@ def build_graph(scores: pd.DataFrame, profiles: pd.DataFrame, isoforms: pd.DataF
                        weight=float(row.interaction_score), score_status=row.score_status)
         graph.add_edge(regulator_node, gene_node, kind="candidate_regulation", evidence=row.evidence_tier,
                        weight=float(row.interaction_score), score_status=row.score_status)
+
+    if cpa_edges is not None and not cpa_edges.empty:
+        pop_cpa_expr = {}
+        if cpa_expr is not None and not cpa_expr.empty:
+            sub_expr = cpa_expr[cpa_expr.population == population]
+            for r in sub_expr.itertuples(index=False):
+                pop_cpa_expr[r.factor] = r
+
+        for row in cpa_edges.itertuples(index=False):
+            cpa_node = str(row.source)
+            target_node = gene_node if row.target == "gene:target" else str(row.target)
+            if target_node in graph or target_node == gene_node:
+                node_attrs = {
+                    "kind": "cpa_factor",
+                    "label": row.factor,
+                    "complex": row.complex,
+                    "pmid": str(row.pmid),
+                }
+                if row.factor in pop_cpa_expr:
+                    r_exp = pop_cpa_expr[row.factor]
+                    node_attrs["mean_expr"] = float(r_exp.mean_expr)
+                    node_attrs["pct_expressing"] = float(r_exp.pct_expressing)
+
+                graph.add_node(cpa_node, **node_attrs)
+                graph.add_edge(
+                    cpa_node,
+                    target_node,
+                    kind=row.kind,
+                    weight=float(row.correlation_r),
+                    p_value=float(row.p_value),
+                    direction=row.direction,
+                    evidence=row.evidence_tier,
+                )
     return graph
 
 
@@ -210,10 +245,13 @@ def compare_populations(scores: pd.DataFrame, priority_df: pd.DataFrame | None =
 
 
 def export_graphs(scores: pd.DataFrame, profiles: pd.DataFrame, isoforms: pd.DataFrame,
-                  regulatory_sites: pd.DataFrame, directory: Path) -> None:
+                  regulatory_sites: pd.DataFrame, directory: Path,
+                  cpa_edges: pd.DataFrame | None = None,
+                  cpa_expr: pd.DataFrame | None = None) -> None:
     directory.mkdir(parents=True, exist_ok=True)
     for population in sorted(profiles.celltype_corrected.unique()):
-        graph = build_graph(scores, profiles, isoforms, regulatory_sites, population)
+        graph = build_graph(scores, profiles, isoforms, regulatory_sites, population,
+                            cpa_edges=cpa_edges, cpa_expr=cpa_expr)
         slug = "".join(c.lower() if c.isalnum() else "_" for c in population).strip("_")
         (directory / f"{slug}.cytoscape.json").write_text(json.dumps(nx.cytoscape_data(graph), indent=2))
         nx.write_graphml(graph, directory / f"{slug}.graphml")

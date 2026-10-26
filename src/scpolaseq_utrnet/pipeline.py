@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from pathlib import Path
+import anndata as ad
 import pandas as pd
 
 from .config import Config
@@ -13,6 +15,7 @@ from .motifs import scan_motifs, import_mirna_sites, scan_mirna_seeds
 from .folding import annotate_accessibility, common_region_accessibility
 from .regulators import regulator_abundance
 from .graphs import score_interactions, compare_populations, export_graphs, site_retention, population_metrics
+from .cpa import extract_cpa_expression, correlate_cpa_with_apa, build_cpa_regulatory_edges
 
 
 def _fingerprint(path: Path) -> dict:
@@ -57,7 +60,28 @@ def build_gene_graphs(config: Config) -> dict[str, Path]:
     population_metrics(scores).to_csv(directory / "population_metrics.csv", index=False)
     rewiring = compare_populations(scores, priority_df=tables.get("apa_priority"))
     rewiring.to_csv(directory / "rewiring.csv", index=False)
-    export_graphs(scores, tables["apa_profiles"], isoforms, regulatory_sites, directory / "graphs")
+    cpa_expr = pd.DataFrame()
+    cpa_correlations = pd.DataFrame()
+    cpa_edges = pd.DataFrame()
+    if config.curated_h5ad.exists():
+        try:
+            adata = ad.read_h5ad(config.curated_h5ad)
+            cpa_expr = extract_cpa_expression(adata, population_col="celltype_corrected")
+            if not cpa_expr.empty:
+                cpa_expr.to_csv(directory / "cpa_expression.csv", index=False)
+                cpa_correlations = correlate_cpa_with_apa(
+                    cpa_expr,
+                    tables["apa_profiles"],
+                    tables.get("apafield_metrics"),
+                )
+                cpa_correlations.to_csv(directory / "cpa_correlations.csv", index=False)
+                cpa_edges = build_cpa_regulatory_edges(cpa_correlations)
+                cpa_edges.to_csv(directory / "cpa_regulatory_edges.csv", index=False)
+        except Exception as exc:
+            logging.getLogger(__name__).warning("CPA machinery analysis failed or skipped: %s", exc)
+
+    export_graphs(scores, tables["apa_profiles"], isoforms, regulatory_sites, directory / "graphs",
+                  cpa_edges=cpa_edges, cpa_expr=cpa_expr)
     sources = [config.curated_h5ad, config.upstream / "pas_reference/pas_reference.tsv",
                config.reference_gtf, config.reference_fasta]
     if config.motif_resource:
