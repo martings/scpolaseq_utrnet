@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scpolaseq-utrnet"
-version = "0.1.0"
+version = "0.2.0"
 description = "Evidence-aware 3′UTR regulatory graphs from frozen scPolASeq outputs"
 readme = "README.md"
 requires-python = ">=3.10"
