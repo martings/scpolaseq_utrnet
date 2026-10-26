@@ -14,6 +14,8 @@ Input source is a frozen scPolASeq run plus a curated downstream AnnData. Preser
 | `site_retention` | regulator and genomic region; present, absent, model-dependent and unresolved PAS IDs | Site availability across candidate 3′UTR models. Ambiguous transcript models are not silently assigned a single state. |
 | `regulator_abundance` | regulator, population, mean mRNA UMI or missing-prior-only status | 10x mRNA counts do not measure miRNA abundance. |
 | `evidence` | accession, source/database, version, assay, cell context, tier, URL | One row per distinct evidence item used by a gene. `not_available` means no externally verified accession. |
+| `population_metrics` | population; candidate regulator/region counts, summed score, score concentration | Descriptive graph summaries; sums are model scores and not molecular occupancy. |
+| `sensitivity` | scenario and population; inclusion, score change, rank stability, changed factors | Graph-only sweep from frozen `interaction_scores`; no PAS or sequence recomputation. |
 
 The package rejects missing PAS IDs, unknown cell barcodes, cluster mismatches, invalid counts, and duplicate exact cell keys. A PAS with no compatible 3′UTR transcript remains as `no_compatible_3utr_model`. The output `provenance.json` records source paths, sizes, timestamps and SHA-256 where practical. All output CSVs contain only a selected gene to keep the demonstration compact.
 

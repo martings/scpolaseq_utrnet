@@ -10,7 +10,7 @@ from .config import load_config
 from .ingest import ingest_gene, write_ingestion
 from .pipeline import build_gene_graphs
 from .graphs import compare_populations
-from .sensitivity import plan, PARAMETERS
+from .sensitivity import plan, PARAMETERS, graph_sweep
 from .visualization import render_gene
 
 
@@ -30,7 +30,7 @@ def main(argv: list[str] | None = None) -> int:
     for name in ["audit", "ingest", "candidates", "build-graph", "compare", "render", "sensitivity"]:
         item = sub.add_parser(name)
         item.add_argument("--config", required=True)
-        if name in {"ingest", "build-graph", "render", "compare"}:
+        if name in {"ingest", "build-graph", "render", "compare", "sensitivity"}:
             item.add_argument("--gene", help="gene symbol or Ensembl base ID")
         if name == "sensitivity":
             item.add_argument("--dry-run", action="store_true")
@@ -87,9 +87,16 @@ def main(argv: list[str] | None = None) -> int:
         print("\n".join(str(x) for x in render_gene(_gene_directory(config))))
         return 0
     if args.command == "sensitivity":
-        if not args.dry_run:
-            parser.error("sensitivity currently requires --dry-run")
-        print(json.dumps(plan(args.change or list(PARAMETERS)), indent=2))
+        if args.dry_run:
+            print(json.dumps(plan(args.change or list(PARAMETERS)), indent=2))
+            return 0
+        if args.change:
+            parser.error("--change is supported only with --dry-run; the executable sweep uses fixed graph-only scenarios")
+        directory = _gene_directory(config)
+        scores = pd.read_csv(directory / "interaction_scores.csv")
+        target = directory / "sensitivity.csv"
+        graph_sweep(scores, config.min_population_cells).to_csv(target, index=False)
+        print(target)
         return 0
     return 1
 

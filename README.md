@@ -17,6 +17,7 @@ utrnet render --config configs/pbmc1k.yaml --gene SAT1
 utrnet build-graph --config configs/pbmc1k.yaml --gene CORO1B
 utrnet render --config configs/pbmc1k.yaml --gene CORO1B
 utrnet sensitivity --config configs/pbmc1k.yaml --dry-run
+utrnet sensitivity --config configs/pbmc1k.yaml --gene SAT1
 ```
 
 Set the two input paths to the completed scPolASeq run and its executed downstream notebook output before running the commands. The configuration rejects unset path variables. Outputs are written under `outputs/pbmc1k/<gene ID>/` and excluded from Git. The HTML explorer, static PNG, normalized CSV tables, Cytoscape JSON, GraphML, and provenance are generated locally. See [PBMC validation](docs/PBMC1K_VALIDATION.md).
@@ -38,7 +39,7 @@ The fixture contains two cells, two strands, exact barcodes with `-1` suffixes, 
 
 Observed: Sierra UMI counts, curated cell identities, and mRNA expression. Annotation-derived: candidate transcript/PAS associations and reconstructed 3′UTR sequences. External experimental evidence: ATtRACT's ELAVL1 and ZFP36 AUUUA motif records from other contexts. Predicted: matches of those motifs and MirGeneDB-derived exact miRNA seeds to SAT1 isoforms, plus interaction scores. Missing by default: RNAplfold accessibility if the executable is absent, measured RBP/AGO occupancy at SAT1 in PBMC, and endogenous miRNA abundance. The optional miRNA genomic-site import uses a versioned TSV; both miRNA evidence modes remain prior-only without small-RNA measurements.
 
-Scores expose usage, model weight, motif presence, accessibility, evidence factor, and abundance factor separately. Missing accessibility or abundance yields an explicitly labeled partial score. The explorer displays up to eight representative regulator patterns for legibility; its site-retention and interaction tables and exported graphs retain the full candidate set. Results compare lineages within one biological sampling context; cells are not independent biological replicates.
+Scores expose usage, model weight, motif presence, accessibility, evidence factor, and abundance factor separately. Missing accessibility or abundance yields an explicitly labeled partial score. `population_metrics.csv` summarizes candidate-network size and weight concentration. The executable sensitivity command writes `sensitivity.csv` with five graph-only scenarios; `--dry-run` still reports which stages a parameter change would invalidate. The explorer displays up to eight representative regulator patterns for legibility; its site-retention and interaction tables and exported graphs retain the full candidate set. Results compare lineages within one biological sampling context; cells are not independent biological replicates.
 
 ## Repository layout
 

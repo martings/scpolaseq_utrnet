@@ -11,6 +11,7 @@ from scpolaseq_utrnet.isoforms import reconstruct_isoforms
 from scpolaseq_utrnet.folding import common_region_accessibility, annotate_accessibility
 from scpolaseq_utrnet.motifs import scan_mirna_seeds
 from scpolaseq_utrnet.graphs import site_retention
+from scpolaseq_utrnet.sensitivity import graph_sweep
 from scpolaseq_utrnet.pipeline import build_gene_graphs
 from scpolaseq_utrnet.visualization import render_gene
 
@@ -45,6 +46,16 @@ def test_synthetic_end_to_end(tmp_path: Path):
     a = scores[(scores.population == "A") & (scores.regulator == "ELAVL1")].interaction_score.iloc[0]
     b = scores[(scores.population == "B") & (scores.regulator == "ELAVL1")].interaction_score.iloc[0]
     assert b > a
+    sensitivity = graph_sweep(scores, min_population_cells=1)
+    assert len(sensitivity) == 10
+    assert (sensitivity[sensitivity.scenario == "baseline"].score_delta_from_baseline == 0).all()
+    base_total = sensitivity[sensitivity.scenario == "baseline"].score_sum.sum()
+    mirna_total = sensitivity[sensitivity.scenario == "miRNA_evidence_double"].score_sum.sum()
+    assert mirna_total > base_total
+    assert not sensitivity[sensitivity.scenario == "stricter_cell_coverage"].included.any()
+    metrics = pd.read_csv(directory / "population_metrics.csv")
+    assert len(metrics) == 2
+    assert (metrics.candidate_regulators == 2).all()
     assert list((directory / "graphs").glob("*.graphml"))
     html, png = render_gene(directory)
     assert html.stat().st_size > 1000 and png.stat().st_size > 1000

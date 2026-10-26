@@ -12,7 +12,7 @@ from .isoforms import reconstruct_isoforms
 from .motifs import scan_motifs, import_mirna_sites, scan_mirna_seeds
 from .folding import annotate_accessibility, common_region_accessibility
 from .regulators import regulator_abundance
-from .graphs import score_interactions, compare_populations, export_graphs, site_retention
+from .graphs import score_interactions, compare_populations, export_graphs, site_retention, population_metrics
 
 
 def _fingerprint(path: Path) -> dict:
@@ -54,6 +54,7 @@ def build_gene_graphs(config: Config) -> dict[str, Path]:
     scores = score_interactions(tables["apa_profiles"], isoforms, regulatory_sites,
                                 abundance, config.min_population_cells)
     scores.to_csv(directory / "interaction_scores.csv", index=False)
+    population_metrics(scores).to_csv(directory / "population_metrics.csv", index=False)
     rewiring = compare_populations(scores)
     rewiring.to_csv(directory / "rewiring.csv", index=False)
     export_graphs(scores, tables["apa_profiles"], isoforms, regulatory_sites, directory / "graphs")

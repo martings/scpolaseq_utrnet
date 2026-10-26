@@ -48,6 +48,28 @@ def site_retention(isoforms: pd.DataFrame, regulatory_sites: pd.DataFrame) -> pd
     return pd.DataFrame(rows, columns=columns)
 
 
+def population_metrics(scores: pd.DataFrame) -> pd.DataFrame:
+    """Descriptive candidate-network size and weight concentration by population."""
+    columns = ["population", "n_cells", "population_coverage_status", "candidate_rows", "candidate_edges",
+               "candidate_regulators", "candidate_genomic_regions", "total_candidate_score",
+               "score_concentration_hhi", "partial_or_missing_rows"]
+    if scores.empty:
+        return pd.DataFrame(columns=columns)
+    rows = []
+    for population, group in scores.groupby("population", sort=True):
+        weights = group.groupby(["regulator", "genomic_region"]).interaction_score.sum().clip(lower=0)
+        total = float(weights.sum())
+        rows.append({"population": population, "n_cells": int(group.n_cells.iloc[0]),
+                     "population_coverage_status": group.population_coverage_status.iloc[0],
+                     "candidate_rows": len(group), "candidate_edges": len(weights),
+                     "candidate_regulators": group.regulator.nunique(),
+                     "candidate_genomic_regions": group.genomic_region.nunique(),
+                     "total_candidate_score": total,
+                     "score_concentration_hhi": float(((weights / total) ** 2).sum()) if total else float("nan"),
+                     "partial_or_missing_rows": int((group.score_status != "complete_prediction").sum())})
+    return pd.DataFrame(rows, columns=columns)
+
+
 def score_interactions(profiles: pd.DataFrame, isoforms: pd.DataFrame,
                        regulatory_sites: pd.DataFrame, abundance: pd.DataFrame,
                        min_population_cells: int) -> pd.DataFrame:

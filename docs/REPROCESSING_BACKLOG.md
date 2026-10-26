@@ -1,6 +1,6 @@
 # Reprocessing and sensitivity backlog
 
-The initial sweep is graph-only and never reruns STARsolo, Sierra or SCAPTURE. `utrnet sensitivity --dry-run` reports the invalidated outputs before any parameter change.
+The first executable sweep is graph-only and never reruns STARsolo, Sierra or SCAPTURE. After `utrnet build-graph`, run `utrnet sensitivity --config configs/pbmc1k.yaml --gene SAT1` to write `sensitivity.csv` from frozen interaction factors. It compares the baseline with half/double miRNA evidence weight, a conservative 0.5 factor for missing accessibility, and a stricter minimum cell count. It reports candidate-edge score sums, rank correlation, top-ten overlap, and population inclusion. These scenarios test model assumptions; they are not biological replicates or calibrated significance tests. `utrnet sensitivity --dry-run` separately reports invalidated outputs before any parameter change.
 
 | Parameter group | Examples | Scientific impact | Runtime/memory | Upstream regeneration | Validation before accepting |
 | --- | --- | --- | --- | --- | --- |
