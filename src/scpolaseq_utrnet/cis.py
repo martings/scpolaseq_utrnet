@@ -69,10 +69,9 @@ def annotate_motif_survival_probabilities(
         distal_coord = pas_df["cleavage_coord"].max()
 
     # Pre-calculate survival field for each unique motif position
-    unique_motifs = regulatory_sites[[
-        "regulatory_site_id", "gene_id", "regulator", "regulator_class",
-        "motif_id", "chrom", "genomic_start", "genomic_end", "strand"
-    ]].drop_duplicates("regulatory_site_id").copy()
+    unique_motifs = regulatory_sites.drop_duplicates("regulatory_site_id").copy()
+    if "gene_id" not in unique_motifs.columns:
+        unique_motifs["gene_id"] = str(pas_sites["gene_id"].iloc[0]) if "gene_id" in pas_sites.columns else "unknown"
 
     unique_motifs["genomic_start"] = unique_motifs["genomic_start"].astype(int)
     unique_motifs["genomic_end"] = unique_motifs["genomic_end"].astype(int)

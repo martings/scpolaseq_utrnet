@@ -15,6 +15,12 @@ from .flow import (
     compute_node_divergence,
     compare_flow_divergence_trajectories,
 )
+from .graph_viz import (
+    filter_top_regulatory_edges,
+    compute_contrast_edge_set,
+    render_celltype_contrast_network,
+    export_interactive_celltype_html,
+)
 
 __all__ = [
     "Config",
@@ -31,5 +37,9 @@ __all__ = [
     "compute_edge_flows",
     "compute_node_divergence",
     "compare_flow_divergence_trajectories",
+    "filter_top_regulatory_edges",
+    "compute_contrast_edge_set",
+    "render_celltype_contrast_network",
+    "export_interactive_celltype_html",
 ]
-__version__ = "0.2.1"
+__version__ = "0.2.2"
