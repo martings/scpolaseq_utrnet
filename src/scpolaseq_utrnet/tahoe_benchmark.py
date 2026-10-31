@@ -106,3 +106,44 @@ def per_condition_metrics(
         mask = labels == label
         records.append({"condition": label, **response_metrics(y[mask], p[mask], top_k=top_k)})
     return pd.DataFrame.from_records(records)
+
+
+def cross_validate_ridge(
+    features: np.ndarray,
+    targets: np.ndarray,
+    conditions: list[str],
+    held_out_conditions: set[str],
+    *,
+    alpha: float = 1.0,
+    top_k: int = 50,
+) -> dict[str, Any]:
+    """Evaluate zero-delta and ridge on the same complete held-out conditions."""
+    import time
+
+    labels = np.asarray(conditions, dtype=str)
+    x = np.asarray(features)
+    y = np.asarray(targets)
+    if x.ndim != 2 or y.ndim != 2 or x.shape[0] != len(labels) or y.shape[0] != len(labels):
+        raise ValueError("features, targets and conditions must have aligned sample rows")
+    test = held_out_condition_mask(labels.tolist(), held_out_conditions)
+    train = ~test
+    if train.sum() < 2 or not test.any():
+        raise ValueError("split must leave at least two training rows and one held-out row")
+    start = time.perf_counter()
+    ridge = RidgeDeltaPredictor(alpha=alpha).fit(x[train], y[train])
+    ridge_prediction = ridge.predict(x[test])
+    elapsed = time.perf_counter() - start
+    baseline_prediction = zero_delta(int(test.sum()), y.shape[1])
+    result = {
+        "held_out_conditions": sorted(held_out_conditions),
+        "train_rows": int(train.sum()),
+        "test_rows": int(test.sum()),
+        "ridge_fit_predict_seconds": elapsed,
+        "zero_delta": response_metrics(y[test], baseline_prediction, top_k=top_k),
+        "ridge": response_metrics(y[test], ridge_prediction, top_k=top_k),
+        "per_condition": {
+            "zero_delta": per_condition_metrics(y[test], baseline_prediction, labels[test].tolist(), top_k=top_k).to_dict(orient="records"),
+            "ridge": per_condition_metrics(y[test], ridge_prediction, labels[test].tolist(), top_k=top_k).to_dict(orient="records"),
+        },
+    }
+    return result
