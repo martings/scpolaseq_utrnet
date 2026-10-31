@@ -12,6 +12,8 @@ def test_gene_graph_model_cpu_forward_backward_and_checkpoint_reproducibility():
     edges = torch.tensor([[0, 1, 2, 3, 4, 1], [1, 2, 3, 4, 0, 0]], dtype=torch.long)
     prediction = model(basal, context, edges)
     assert prediction.shape == (4, 5)
+    batched_prediction = torch.cat([model(basal.detach()[i:i+1], context[i:i+1], edges) for i in range(4)], dim=0)
+    assert torch.allclose(prediction.detach(), batched_prediction)
     prediction.square().mean().backward()
     assert basal.grad is not None and torch.isfinite(basal.grad).all()
     assert all(parameter.grad is not None for parameter in model.parameters())
