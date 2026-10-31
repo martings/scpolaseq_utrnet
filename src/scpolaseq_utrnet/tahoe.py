@@ -176,7 +176,7 @@ def select_metadata_first_pilot(
     for column in ("sample", "plate", "cell_line_id", "drug", "drugname_drugconc"):
         frame[column] = frame[column].astype(str)
     frame["n_cells"] = pd.to_numeric(frame["n_cells"], errors="raise")
-    controls = frame[frame.drug == CONTROL_DRUG]
+    controls = frame[(frame.drug == CONTROL_DRUG) & (frame.n_cells >= min_cells)]
     treatments = frame[frame.drug != CONTROL_DRUG]
     group_cols = ["cell_line_id", "drug", "drugname_drugconc"]
     candidates: list[dict[str, Any]] = []
