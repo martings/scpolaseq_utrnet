@@ -107,5 +107,6 @@ def inspect_file_budget(audit: Mapping[str, Any], *, max_metadata_bytes: int) ->
         "known_metadata_bytes": known_bytes,
         "within_budget": known_bytes <= max_metadata_bytes,
         "metadata_file_count": len(metadata_files),
-        "expression_bytes_downloaded": 0,\n        "pseudobulk_de_bytes_downloaded": 0,
+        "expression_bytes_downloaded": 0,
+        "pseudobulk_de_bytes_downloaded": 0,
     }
