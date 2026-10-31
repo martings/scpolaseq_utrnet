@@ -33,6 +33,22 @@ Map gene tokens through gene_metadata.token_id to ensembl_id and gene_symbol. Di
 
 DMSO_TF controls must match both experimental plate and cell_line_id. Dose is present in sample_metadata.drugname_drugconc as a stringified list of tuples carrying compound, concentration and unit; retain the original field as well as parsed numeric value and unit. The sample identifier is the replicate unit available in the table. Cell counts measure coverage and are not biological replicates. Exact treatment/control sample counts and plate overlap remain to be calculated from pinned metadata and expression indexes.
 
+
+## Observed metadata table schemas and shard layout
+
+The dataset card documents these metadata columns:
+
+- gene_metadata: gene_symbol, ensembl_id, token_id.
+- sample_metadata: sample, plate, mean_gene_count, mean_tscp_count, mean_mread_count, mean_pcnt_mito, drug, drugname_drugconc.
+- drug_metadata: drug, targets, moa-broad, moa-fine, human-approved, clinical-trials, gpt-notes-approval, canonical_smiles, pubchem_cid.
+- cell_line_metadata: cell_name, Cell_ID_DepMap, Cell_ID_Cellosaur, Organ, Driver_Gene_Symbol, Driver_VarZyg, Driver_VarType, Driver_ProtEffect_or_CdnaEffect, Driver_Mech_InferDM, Driver_GeneType_DM.
+- obs_metadata: BARCODE_SUB_LIB_ID is the documented join key; the card does not enumerate its full columns.
+- pseudobulk_differential_expression: separate configuration is present; its fields and statistical aggregation are not described in the card and must be captured from the pinned dataset builder.
+
+At the inspected revision the Hugging Face file browser showed 3,388 expression Parquet shards under data/ (338 GB directory total), and the full repository at about 429 GB. The metadata directory was about 91.2 GB because it includes the 88.9 GB pseudobulk DE directory; that DE directory contains 1,026 Parquet shards. The directly listed metadata file sizes were approximately 2.29 GB for obs_metadata, 1.33 MB for gene_metadata, 65.6 kB for sample_metadata, 40.5 kB for drug_metadata and 19 kB for cell_line_metadata. These are browser-reported file sizes, not measured download traffic.
+
+The source README marks the Parquet configs listed above and records the expression train split as 95,624,334 rows. The file browser's shard totals and repo storage are retained as separate storage observations, not interpreted as row counts.
+
 ## Other annotations and measurements
 
 - drug_metadata includes targets, moa-broad, moa-fine, approval/trial annotations, SMILES and PubChem IDs. Targets and MOA labels are metadata curated/inferred with GPT-based annotation and compound-source information; they are contextual metadata, not verified direct mechanisms in the assayed cells.
