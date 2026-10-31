@@ -170,8 +170,8 @@ def select_metadata_first_pilot(
         raise ValueError("pilot requires at least one cell line and 3–5 conditions")
     required = {"sample", "plate", "cell_line_id", "drug", "drugname_drugconc", "n_cells"}
     validate_columns(sample_index, required, "sample_index")
-    if sample_index["sample"].astype(str).duplicated().any():
-        raise ValueError("sample_index must have one unique row per sample")
+    if sample_index[["sample", "cell_line_id"]].astype(str).duplicated().any():
+        raise ValueError("sample_index must have one unique row per sample and cell line")
     frame = sample_index.copy()
     for column in ("sample", "plate", "cell_line_id", "drug", "drugname_drugconc"):
         frame[column] = frame[column].astype(str)
