@@ -62,7 +62,7 @@ def test_concentration_parser_retains_value_and_unit():
 def test_metadata_selector_matches_same_plate_and_cell_line():
     rows = []
     for line in ("line-a", "line-b"):
-        for drug in ("drug-a", "drug-b"):
+        for drug in ("drug-a", "drug-b", "drug-c"):
             for replicate in range(2):
                 rows.append({
                     "sample": f"{line}-{drug}-{replicate}", "plate": "plate1",
@@ -78,6 +78,8 @@ def test_metadata_selector_matches_same_plate_and_cell_line():
             })
     frame = pd.DataFrame(rows)
     manifest = select_metadata_first_pilot(frame, conditions=3, min_cells=10)
+    assert len(manifest["selected_cell_lines"]) == 2
+    assert manifest["unique_perturbation_condition_n"] == 3
     assert len({x["cell_line_id"] for x in manifest["conditions"]}) == 2
     assert all(x["treatment_sample_n"] == 2 and x["control_sample_n"] == 2 for x in manifest["conditions"])
     assert all(x["matched_plates"] == ["plate1"] for x in manifest["conditions"])
@@ -94,7 +96,7 @@ def test_control_without_plate_or_cell_line_match_is_not_selected():
         {"sample": "c2", "plate": "plate2", "cell_line_id": "line-a", "drug": "DMSO_TF",
          "drugname_drugconc": "[]", "n_cells": 20},
     ])
-    with pytest.raises(ValueError, match="cell lines"):
+    with pytest.raises(ValueError, match="controls"):
         select_metadata_first_pilot(frame, conditions=3, min_cells=10)
 
 
@@ -104,3 +106,22 @@ def test_partition_leakage_guard():
     leaking = pd.DataFrame({"replicate": ["r1", "r1"], "partition": ["train", "test"]})
     with pytest.raises(ValueError, match="leakage"):
         validate_group_partition(leaking, group_column="replicate")
+
+
+def test_schema_change_is_reported_as_missing_columns():
+    from scpolaseq_utrnet.tahoe import validate_columns
+
+    with pytest.raises(ValueError, match="missing required columns"):
+        validate_columns(pd.DataFrame({"genes": []}), {"genes", "expressions"}, "expression_data")
+
+
+def test_sparse_counts_reject_inconsistent_marker_tokens():
+    genes = pd.DataFrame({
+        "token_id": [10], "gene_symbol": ["A"], "ensembl_id": ["ENSG000001"],
+    })
+    rows = [
+        {"genes": [0, 10], "expressions": [-2, 1], "BARCODE_SUB_LIB_ID": "cell-1"},
+        {"genes": [9, 10], "expressions": [-2, 1], "BARCODE_SUB_LIB_ID": "cell-2"},
+    ]
+    with pytest.raises(ValueError, match="unexpected marker"):
+        sparse_counts(rows, genes)
