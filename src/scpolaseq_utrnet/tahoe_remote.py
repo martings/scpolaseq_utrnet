@@ -24,7 +24,7 @@ def inspect_dataset_revision(revision: str = DATASET_REVISION) -> dict[str, Any]
     files = []
     for sibling in siblings:
         path = getattr(sibling, "rfilename", None)
-        size = getattr(getattr(sibling, "blob_id", None), "size", None)
+        size = getattr(sibling, "size", None)
         if path:
             files.append({"path": path, "size_bytes": size})
     config_names = get_dataset_config_names(DATASET_ID, revision=resolved_revision)
@@ -99,7 +99,7 @@ def inspect_file_budget(audit: Mapping[str, Any], *, max_metadata_bytes: int) ->
         raise ValueError("max_metadata_bytes must be explicitly positive")
     metadata_files = [
         item for item in audit.get("files", [])
-        if str(item.get("path", "")).startswith("metadata/")
+        if str(item.get("path", "")).startswith("metadata/") and not str(item.get("path", "")).startswith("metadata/pseudobulk_differential_expression/")
     ]
     known_bytes = sum(int(item["size_bytes"]) for item in metadata_files if item.get("size_bytes") is not None)
     return {
@@ -107,5 +107,5 @@ def inspect_file_budget(audit: Mapping[str, Any], *, max_metadata_bytes: int) ->
         "known_metadata_bytes": known_bytes,
         "within_budget": known_bytes <= max_metadata_bytes,
         "metadata_file_count": len(metadata_files),
-        "expression_bytes_downloaded": 0,
+        "expression_bytes_downloaded": 0,\n        "pseudobulk_de_bytes_downloaded": 0,
     }
