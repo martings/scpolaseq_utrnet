@@ -63,10 +63,11 @@ utrnet-tahoe-smoke
 utrnet-tahoe audit --revision 349e2a55f5538a3e73b32a06c6bdd8e9e87011e8 --max-metadata-bytes 2500000000 --output outputs/tahoe/source-audit.json
 ```
 
-Build a sample index from a projected metadata scan, then choose the pilot from observed sample, cell-line, dose, QC and plate-matched DMSO metadata:
+Build a sample index by streaming only projected obs_metadata fields, with a byte cap checked before the scan, then choose the pilot from observed sample, cell-line, dose, QC and plate-matched DMSO metadata:
 
 ```bash
+utrnet-tahoe index --max-metadata-bytes 2500000000 --output outputs/tahoe/sample-index.csv
 utrnet-tahoe select --sample-index outputs/tahoe/sample-index.csv --conditions 4 --output outputs/tahoe/selection-manifest.json
 ```
 
-The selector uses unique sample IDs as replicate units and cell counts only as coverage. Use tahoe_cache.write_sparse_cache with a positive max_bytes value to save a selected CSR pilot matrix and its identity sidecar. It does not treat Tahoe as time-course or gene-editing Perturb-seq data. See [the source audit](docs/TAHOE_100M_AUDIT.md) and [the contract mapping](docs/CELL_REGULATORY_STATE_V0.1_MAPPING.md). No expression or pseudobulk shards are downloaded by the audit command.
+The selector uses unique sample IDs as replicate units and cell counts only as coverage. The committed candidate manifest was selected from obs_metadata; its coverage totals include both `full` and `minimal` filter categories. Validate full-only sample-line counts against expression before caching or training. Use tahoe_cache.write_sparse_cache with a positive max_bytes value to save a selected CSR pilot matrix and its identity sidecar. It does not treat Tahoe as time-course or gene-editing Perturb-seq data. See [the source audit](docs/TAHOE_100M_AUDIT.md) and [the contract mapping](docs/CELL_REGULATORY_STATE_V0.1_MAPPING.md). No expression or pseudobulk shards are downloaded by the audit command.
