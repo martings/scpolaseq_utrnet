@@ -38,6 +38,8 @@ def inspect_dataset_revision(revision: str = DATASET_REVISION) -> dict[str, Any]
         "requested_revision": revision,
         "resolved_revision": resolved_revision,
         "configs": list(config_names),
+        "expected_configs": list(CONFIGS),
+        "missing_expected_configs": sorted(set(CONFIGS) - set(config_names)),
         "schemas": schemas,
         "files": files,
         "data_shards_downloaded": 0,
