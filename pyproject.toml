@@ -19,6 +19,7 @@ gnn = ["torch>=2"]
 [project.scripts]
 utrnet = "scpolaseq_utrnet.cli:main"
 utrnet-tahoe = "scpolaseq_utrnet.tahoe_cli:main"
+utrnet-tahoe-smoke = "scpolaseq_utrnet.tahoe_smoke:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
