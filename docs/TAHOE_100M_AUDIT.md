@@ -57,6 +57,11 @@ The source README marks the Parquet configs listed above and records the express
 - pseudobulk_differential_expression is available as its own configuration, with 1,026 sharded Parquet files. Its current full schema and aggregation definition still require inspection from the pinned builder before benchmark use.
 - This is a fixed endpoint perturbation atlas. The source description does not provide time-course measurements or gene-editing Perturb-seq interventions.
 
+
+## Access-path evaluation
+
+Hugging Face streaming is the safe way to avoid downloading the complete expression repository, but an unfiltered scan over 3,388 shards can still consume substantial bandwidth. Projection to the metadata columns is necessary before a sample-index scan; the current helper accepts such projected rows and intentionally does not start a network scan itself. Parquet row-group access can reduce transfer further only if the remote store supports range reads and row-group statistics are useful for the desired columns. The pinned card does not document partition pruning guarantees, and no pilot row groups have yet been fetched or benchmarked. Selection must therefore remain a metadata-index operation with an explicit byte cap before any expression cache is materialized.
+
 ## Download budget and next validation
 
 The full expression split is far outside the pilot budget. Do not materialize it or the full pseudobulk DE configuration. The adapter must require an explicit byte cap for cached expression shards and write the selected config, source revision, sample IDs, control matching, bytes fetched, and checksums to the manifest. Metadata-only builder inspection is the first executable audit. Selection remains pending until actual pinned metadata establish two cell lines, 3–5 conditions, matched plate/cell-line controls, QC coverage, and at least two unique sample IDs per treatment/control group.
