@@ -5,6 +5,7 @@ from scpolaseq_utrnet.tahoe_benchmark import (
     RidgeDeltaPredictor,
     held_out_condition_mask,
     response_metrics,
+    cross_validate_ridge,
 )
 
 
@@ -22,3 +23,12 @@ def test_condition_holdout_uses_whole_conditions():
     assert mask.tolist() == [False, True, False, False]
     with pytest.raises(ValueError, match="absent"):
         held_out_condition_mask(["a", "b"], {"missing"})
+
+
+def test_zero_and_ridge_share_complete_condition_holdout():
+    x = np.array([[0.0], [0.1], [1.0], [1.1]])
+    y = np.array([[0.0, 0.0], [0.1, 0.0], [1.0, 0.0], [1.1, 0.0]])
+    result = cross_validate_ridge(x, y, ["train", "train", "held", "held"], {"held"}, top_k=1)
+    assert result["train_rows"] == 2
+    assert result["test_rows"] == 2
+    assert set(result["per_condition"]) == {"zero_delta", "ridge"}
