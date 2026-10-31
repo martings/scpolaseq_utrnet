@@ -62,6 +62,15 @@ The source README marks the Parquet configs listed above and records the express
 
 Hugging Face streaming is the safe way to avoid downloading the complete expression repository, but an unfiltered scan over 3,388 shards can still consume substantial bandwidth. Projection to the metadata columns is necessary before a sample-index scan; the current helper accepts such projected rows and intentionally does not start a network scan itself. Parquet row-group access can reduce transfer further only if the remote store supports range reads and row-group statistics are useful for the desired columns. The pinned card does not document partition pruning guarantees, and no pilot row groups have yet been fetched or benchmarked. Selection must therefore remain a metadata-index operation with an explicit byte cap before any expression cache is materialized.
 
+## Implementation status at this revision
+
+- Source card audit: recorded and pinned; the runtime audit command is responsible for saving complete builder schemas for the two card-undocumented tables.
+- Structural smoke: implemented against a checked-in synthetic fixture; it makes no biological claim.
+- Pilot selector: implemented and tested against synthetic metadata. A real sample index has not been produced, so there is no selected biological subset in this PR.
+- Sparse cache and resource reporting: implemented with explicit cache limits; actual storage, throughput, RAM and VRAM measurements require the real pilot.
+- Baselines and GNN: a zero-delta baseline, ridge evaluator and optional two-layer GNN are implemented as benchmark components. No model has been trained on Tahoe, and no comparative performance is reported.
+- Shared architecture contract: field mapping is documented, but the canonical cell-regulatory-state/v0.1 schema was not in the repository tree, so strict schema validation remains pending.
+
 ## Download budget and next validation
 
 The full expression split is far outside the pilot budget. Do not materialize it or the full pseudobulk DE configuration. The adapter must require an explicit byte cap for cached expression shards and write the selected config, source revision, sample IDs, control matching, bytes fetched, and checksums to the manifest. Metadata-only builder inspection is the first executable audit. Selection remains pending until actual pinned metadata establish two cell lines, 3–5 conditions, matched plate/cell-line controls, QC coverage, and at least two unique sample IDs per treatment/control group.
