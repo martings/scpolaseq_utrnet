@@ -119,7 +119,7 @@ def sparse_counts(
     *,
     marker_token_id: int | None = None,
 ) -> tuple[sparse.csr_matrix, list[str], list[str]]:
-    """Build a cell-by-gene CSR matrix; row order and raw cell IDs are preserved."""
+    """Build a cell-by-gene CSR matrix; infer and validate the leading marker."""
     token_map = make_gene_map(gene_metadata)
     gene_ids = sorted(set(token_map.values()))
     gene_col = {gene_id: i for i, gene_id in enumerate(gene_ids)}
@@ -128,14 +128,20 @@ def sparse_counts(
     col_ix: list[int] = []
     values: list[int] = []
     seen_cells: set[str] = set()
+    expected_marker = marker_token_id
     for row in rows:
         cell_id = str(row["BARCODE_SUB_LIB_ID"])
         if cell_id in seen_cells:
             raise ValueError(f"duplicate BARCODE_SUB_LIB_ID {cell_id}")
         seen_cells.add(cell_id)
+        if expected_marker is None:
+            tokens = list(row["genes"])
+            if not tokens:
+                raise ValueError("expression row is empty")
+            expected_marker = int(tokens[0])
         cell_ix = len(cell_ids)
         cell_ids.append(cell_id)
-        for gene_id, count in expression_row_to_pairs(row, token_map, marker_token_id=marker_token_id):
+        for gene_id, count in expression_row_to_pairs(row, token_map, marker_token_id=expected_marker):
             row_ix.append(cell_ix)
             col_ix.append(gene_col[gene_id])
             values.append(count)
@@ -145,8 +151,6 @@ def sparse_counts(
         dtype=np.int64,
     ).tocsr()
     return matrix, cell_ids, gene_ids
-
-
 def select_metadata_first_pilot(
     sample_index: pd.DataFrame,
     *,
@@ -174,65 +178,89 @@ def select_metadata_first_pilot(
     frame["n_cells"] = pd.to_numeric(frame["n_cells"], errors="raise")
     controls = frame[frame.drug == CONTROL_DRUG]
     treatments = frame[frame.drug != CONTROL_DRUG]
-    candidates: list[dict[str, Any]] = []
     group_cols = ["cell_line_id", "drug", "drugname_drugconc"]
+    candidates: list[dict[str, Any]] = []
     for key, group in treatments.groupby(group_cols, sort=True):
         cell_line, drug, dose_label = key
         group = group[group.n_cells >= min_cells]
-        matched = controls[controls.cell_line_id == cell_line]
-        treatment_plates = sorted(set(group.plate))
-        matched = matched[matched.plate.isin(treatment_plates)]
-        if group["sample"].nunique() < min_treatment_samples or matched["sample"].nunique() < min_control_samples:
+        matched_treatments = []
+        matched_controls = []
+        for plate in sorted(group.plate.unique()):
+            treatment_plate = group[group.plate == plate]
+            control_plate = controls[
+                (controls.cell_line_id == cell_line) & (controls.plate == plate)
+            ]
+            if not control_plate.empty:
+                matched_treatments.append(treatment_plate)
+                matched_controls.append(control_plate)
+        if not matched_treatments:
             continue
+        group = pd.concat(matched_treatments, ignore_index=True)
+        matched = pd.concat(matched_controls, ignore_index=True).drop_duplicates("sample")
         treatment_samples = sorted(group["sample"].unique())
         control_samples = sorted(matched["sample"].unique())
-        if len(treatment_samples) < min_treatment_samples:
+        if len(treatment_samples) < min_treatment_samples or len(control_samples) < min_control_samples:
             continue
+        matched_plates = sorted(group.plate.unique())
         candidates.append({
             "cell_line_id": cell_line,
             "drug": drug,
             "condition": dose_label,
+            "perturbation_condition": f"{drug} | {dose_label}",
             "concentrations": parse_concentrations(dose_label),
             "treatment_samples": treatment_samples,
             "control_samples": control_samples,
-            "matched_plates": treatment_plates,
+            "matched_plates": matched_plates,
             "treatment_sample_n": len(treatment_samples),
             "control_sample_n": len(control_samples),
             "treatment_cell_n": int(group.n_cells.sum()),
             "control_cell_n": int(matched.n_cells.sum()),
             "selection_basis": "unique sample IDs are replicate units; cell counts are coverage only",
         })
-    candidates.sort(key=lambda x: (
-        -min(x["treatment_sample_n"], x["control_sample_n"]),
-        -x["treatment_cell_n"],
-        x["cell_line_id"], x["drug"], x["condition"],
-    ))
-    selected: list[dict[str, Any]] = []
-    used_lines: set[str] = set()
+    if not candidates:
+        raise ValueError("no replicated treatment has plate- and cell-line-matched controls")
+    line_scores: dict[str, tuple[int, int]] = {}
+    for line in sorted({item["cell_line_id"] for item in candidates}):
+        line_items = [item for item in candidates if item["cell_line_id"] == line]
+        line_scores[line] = (
+            len({item["perturbation_condition"] for item in line_items}),
+            sum(item["treatment_cell_n"] for item in line_items),
+        )
+    ranked_lines = sorted(line_scores, key=lambda line: (-line_scores[line][0], -line_scores[line][1], line))
+    selected_lines = set(ranked_lines[:cell_lines])
+    if len(selected_lines) < cell_lines:
+        raise ValueError(f"only {len(selected_lines)} cell lines meet matched-control/replicate criteria")
+    by_perturbation: dict[str, list[dict[str, Any]]] = {}
     for item in candidates:
-        if item["cell_line_id"] not in used_lines and len(used_lines) < cell_lines:
-            selected.append(item)
-            used_lines.add(item["cell_line_id"])
-    if len(used_lines) < cell_lines:
-        raise ValueError(f"only {len(used_lines)} cell lines meet matched-control/replicate criteria")
-    for item in candidates:
-        if len(selected) >= conditions:
-            break
-        if item not in selected and item["cell_line_id"] in used_lines:
-            selected.append(item)
-    if len(selected) < 3:
-        raise ValueError(f"only {len(selected)} replicated, plate-matched conditions qualify")
+        if item["cell_line_id"] in selected_lines:
+            by_perturbation.setdefault(item["perturbation_condition"], []).append(item)
+    ranked_conditions = sorted(
+        by_perturbation,
+        key=lambda name: (
+            -len({item["cell_line_id"] for item in by_perturbation[name]}),
+            -min(item["treatment_sample_n"] for item in by_perturbation[name]),
+            -sum(item["treatment_cell_n"] for item in by_perturbation[name]),
+            name,
+        ),
+    )
+    chosen_names = ranked_conditions[:conditions]
+    if len(chosen_names) < 3:
+        raise ValueError(f"only {len(chosen_names)} unique perturbation conditions qualify")
+    selected = [
+        item for name in chosen_names
+        for item in sorted(by_perturbation[name], key=lambda x: x["cell_line_id"])
+    ]
     return {
         "contract": "cell-regulatory-state/v0.1",
         "source_dataset": DATASET_ID,
         "source_revision": DATASET_REVISION,
-        "selection_method": "metadata-first, deterministic quality/replicate ranking",
+        "selection_method": "metadata-first, deterministic replicate/QC ranking",
+        "selected_cell_lines": sorted(selected_lines),
+        "unique_perturbation_condition_n": len(chosen_names),
         "sample_is_replicate_unit": True,
         "cell_count_is_biological_replication": False,
         "conditions": selected,
     }
-
-
 def validate_group_partition(
     assignments: pd.DataFrame,
     *,
