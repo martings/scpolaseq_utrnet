@@ -6,7 +6,7 @@
 - Revision inspected: 349e2a55f5538a3e73b32a06c6bdd8e9e87011e8 (HF main at inspection).
 - Dataset license declared on the card: CC0-1.0.
 - Provenance: Tahoe Bio describes the atlas as produced with Vevo Therapeutics' Mosaic platform; the card cites the 2025 Tahoe-100M bioRxiv preprint.
-- No expression or metadata shards were downloaded for this initial pass.
+- No expression-count or pseudobulk DE shards were downloaded. The obs_metadata table was streamed with projected columns under an explicit 2,500,000,000-byte source-file ceiling; the file was not retained locally.
 
 ## Observed configuration and storage inventory
 
@@ -42,38 +42,48 @@ The dataset card documents these metadata columns:
 - sample_metadata: sample, plate, mean_gene_count, mean_tscp_count, mean_mread_count, mean_pcnt_mito, drug, drugname_drugconc.
 - drug_metadata: drug, targets, moa-broad, moa-fine, human-approved, clinical-trials, gpt-notes-approval, canonical_smiles, pubchem_cid.
 - cell_line_metadata: cell_name, Cell_ID_DepMap, Cell_ID_Cellosaur, Organ, Driver_Gene_Symbol, Driver_VarZyg, Driver_VarType, Driver_ProtEffect_or_CdnaEffect, Driver_Mech_InferDM, Driver_GeneType_DM.
-- obs_metadata: BARCODE_SUB_LIB_ID is the documented join key; the card does not enumerate its full columns.
-- pseudobulk_differential_expression: separate configuration is present; its fields and statistical aggregation are not described in the card and must be captured from the pinned dataset builder.
+- obs_metadata: plate (string), BARCODE_SUB_LIB_ID (string), sample (string), gene_count (int64), tscp_count (int64), mread_count (int64), drugname_drugconc (string), drug (string), cell_line (string), sublibrary (string), BARCODE (string), pcnt_mito (float32), S_score (float64), G2M_score (float64), phase (string), pass_filter (string), cell_name (string), and __index_level_0__ (int64).
+- pseudobulk_differential_expression: gene_name (string), baseMean/log2FoldChange/lfcSE/stat/pvalue/padj (float32), plate (string), n_cells_trt/n_cells_ctrl (int64), Cell_ID_Cellosaur/Cell_ID_DepMap/drug/concentration_unit/Cell_Name_Vevo (string), concentration (float32). The card does not document the DE statistical model or contrast construction.
+- Actual feature types come from the pinned dataset viewer's first-rows schemas. One schema mismatch is material: drug_metadata.pubchem_cid is float64, while expression_data.pubchem_cid is string.
 
 At the inspected revision the Hugging Face file browser showed 3,388 expression Parquet shards under data/ (338 GB directory total), and the full repository at about 429 GB. The metadata directory was about 91.2 GB because it includes the 88.9 GB pseudobulk DE directory; that DE directory contains 1,026 Parquet shards. The directly listed metadata file sizes were approximately 2.29 GB for obs_metadata, 1.33 MB for gene_metadata, 65.6 kB for sample_metadata, 40.5 kB for drug_metadata and 19 kB for cell_line_metadata. These are browser-reported file sizes, not measured download traffic.
 
 The source README marks the Parquet configs listed above and records the expression train split as 95,624,334 rows. The file browser's shard totals and repo storage are retained as separate storage observations, not interpreted as row counts.
 
+## Observed metadata scan and replicate structure
+
+A projected streaming pass over obs_metadata read 100,648,790 rows: 95,624,334 had pass_filter=full and 5,024,456 had pass_filter=minimal. The full count equals the expression_data split's 95,624,334 rows. The observation table covers 50 Cellosaurus cell-line IDs, 1,344 unique sample IDs, 380 drug labels, 1,138 drug-dose labels, 14 plates, and 67,043 sample-by-cell-line groups.
+
+A sample ID is reused across the mixed-cell-line spheroid: a single sample/well contains multiple cell lines. Therefore the metadata index key is (sample, cell_line_id), while partition assignment must keep the source sample ID together across every cell line. Count cells within each sample-line group; do not count cells as replicate units. The expression table corresponds to pass_filter=full; minimal-filter observations are retained as a separate coverage statistic and excluded from expression-compatible n_cells.
+
+A metadata-first candidate selection manifest is included as provisional. Its coverage values are from the complete obs_metadata table before separating full and minimal rows; it still needs expression-compatible sample-line count validation before caching or model evaluation.
+
 ## Other annotations and measurements
 
 - drug_metadata includes targets, moa-broad, moa-fine, approval/trial annotations, SMILES and PubChem IDs. Targets and MOA labels are metadata curated/inferred with GPT-based annotation and compound-source information; they are contextual metadata, not verified direct mechanisms in the assayed cells.
 - cell_line_metadata includes Cellosaurus, DepMap, lineage and driver alteration annotations.
-- obs_metadata is a separate Parquet table keyed by BARCODE_SUB_LIB_ID. The current card does not expose its complete column schema; runtime audit must record builder feature metadata before use.
-- pseudobulk_differential_expression is available as its own configuration, with 1,026 sharded Parquet files. Its current full schema and aggregation definition still require inspection from the pinned builder before benchmark use.
+- obs_metadata is a separate Parquet table keyed by BARCODE_SUB_LIB_ID; its full schema is recorded above. cell_line contains Cellosaurus IDs and matches expression_data.cell_line_id.
+- pseudobulk_differential_expression is available as its own configuration, with 1,026 sharded Parquet files. Its feature schema is recorded above, but contrast/statistical-method provenance still requires source-method review.
 - This is a fixed endpoint perturbation atlas. The source description does not provide time-course measurements or gene-editing Perturb-seq interventions.
 
 
 ## Access-path evaluation
 
-Hugging Face streaming is the safe way to avoid downloading the complete expression repository, but an unfiltered scan over 3,388 shards can still consume substantial bandwidth. Projection to the metadata columns is necessary before a sample-index scan; the current helper accepts such projected rows and intentionally does not start a network scan itself. Parquet row-group access can reduce transfer further only if the remote store supports range reads and row-group statistics are useful for the desired columns. The pinned card does not document partition pruning guarantees, and no pilot row groups have yet been fetched or benchmarked. Selection must therefore remain a metadata-index operation with an explicit byte cap before any expression cache is materialized.
+Hugging Face streaming is the safe way to avoid downloading the complete expression repository, but an unfiltered scan over 3,388 shards can still consume substantial bandwidth. Projection to sample, cell-line, plate, drug, dose, QC and pass_filter columns avoids reading the large genes/expressions arrays. A streaming scan of the projected obs_metadata table was completed under a prechecked 2.5 GB source-file budget. The complete expression data (3,388 shards, 338 GB) remains untouched. Parquet row-group access could reduce transfer further if range reads and row-group statistics are useful; no expression row groups have been fetched or benchmarked.
 
 ## Implementation status at this revision
 
-- Source card audit: recorded and pinned; the runtime audit command is responsible for saving complete builder schemas for the two card-undocumented tables.
+- Source audit: pinned schemas for all seven configs and file inventory recorded. The source DE contrast-generation method remains undocumented.
+- Metadata scan: completed on projected obs_metadata columns; the full/minimal pass_filter split and shared sample IDs across cell lines are recorded.
 - Structural smoke: implemented against a checked-in synthetic fixture; it makes no biological claim.
-- Pilot selector: implemented and tested against synthetic metadata. A real sample index has not been produced, so there is no selected biological subset in this PR.
+- Pilot selector: tested against synthetic metadata. A provisional 2-cell-line/4-dose-condition candidate is recorded; exact full-filter counts for those selected sample-line groups and expression extraction remain pending.
 - Sparse cache and resource reporting: implemented with explicit cache limits; actual storage, throughput, RAM and VRAM measurements require the real pilot.
 - Baselines and GNN: a zero-delta baseline, ridge evaluator and optional two-layer GNN are implemented as benchmark components. No model has been trained on Tahoe, and no comparative performance is reported.
 - Shared architecture contract: field mapping is documented, but the canonical cell-regulatory-state/v0.1 schema was not in the repository tree, so strict schema validation remains pending.
 
 ## Download budget and next validation
 
-The full expression split is far outside the pilot budget. Do not materialize it or the full pseudobulk DE configuration. The adapter must require an explicit byte cap for cached expression shards and write the selected config, source revision, sample IDs, control matching, bytes fetched, and checksums to the manifest. Metadata-only builder inspection is the first executable audit. Selection remains pending until actual pinned metadata establish two cell lines, 3–5 conditions, matched plate/cell-line controls, QC coverage, and at least two unique sample IDs per treatment/control group.
+The full expression split is far outside the pilot budget. Do not materialize it or the full pseudobulk DE configuration. The index command checks the obs_metadata file size against an explicit byte cap before streaming projected fields. The cache writer also requires an explicit pilot-cache byte cap and writes source revision, identities, count totals and missing modalities. Before the provisional conditions can be cached, validate their pass_filter=full counts and determine a bounded row-group strategy for retrieving only those cells; record actual bytes and checksums. No full-scale training is authorized before that validation.
 
 ## Architecture contract mapping
 
