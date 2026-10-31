@@ -31,7 +31,7 @@ Map gene tokens through gene_metadata.token_id to ensembl_id and gene_symbol. Di
 
 ## Matching, replication and dose
 
-DMSO_TF controls must match both experimental plate and cell_line_id. Dose is present in sample_metadata.drugname_drugconc as a stringified list of tuples carrying compound, concentration and unit; retain the original field as well as parsed numeric value and unit. The sample identifier is the replicate unit available in the table. Cell counts measure coverage and are not biological replicates. Exact treatment/control sample counts and plate overlap remain to be calculated from pinned metadata and expression indexes.
+DMSO_TF controls must match both experimental plate and cell_line_id. Dose is present in sample_metadata.drugname_drugconc as a stringified list of tuples carrying compound, concentration and unit; retain the original field as well as parsed numeric value and unit. The sample identifier is the replicate unit available in the table. Cell counts measure coverage and are not biological replicates. The projected metadata scan identified a provisional candidate with matched treatment/control sample IDs and plate overlap (recorded in the selection manifest). Those candidate coverage counts combine full and minimal observations; expression-compatible full-only counts still require validation before caching.
 
 
 ## Observed metadata table schemas and shard layout
