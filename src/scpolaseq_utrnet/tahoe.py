@@ -215,7 +215,9 @@ def select_metadata_first_pilot(
             "control_sample_n": len(control_samples),
             "treatment_cell_n": int(group.n_cells.sum()),
             "control_cell_n": int(matched.n_cells.sum()),
-            "selection_basis": "unique sample IDs are replicate units; cell counts are coverage only",
+            "mean_gene_count": float(pd.to_numeric(group.get("mean_gene_count", pd.Series(dtype=float)), errors="coerce").mean()) if "mean_gene_count" in group else float("nan"),
+            "mean_pcnt_mito": float(pd.to_numeric(group.get("mean_pcnt_mito", pd.Series(dtype=float)), errors="coerce").mean()) if "mean_pcnt_mito" in group else float("nan"),
+            "selection_basis": "unique sample IDs are replicate units; cell counts are coverage only; QC metrics rank qualifying conditions",
         })
     if not candidates:
         raise ValueError("no replicated treatment has plate- and cell-line-matched controls")
@@ -240,10 +242,27 @@ def select_metadata_first_pilot(
             -len({item["cell_line_id"] for item in by_perturbation[name]}),
             -min(item["treatment_sample_n"] for item in by_perturbation[name]),
             -sum(item["treatment_cell_n"] for item in by_perturbation[name]),
+            -sum(item["mean_gene_count"] for item in by_perturbation[name] if np.isfinite(item["mean_gene_count"])),
+            sum(item["mean_pcnt_mito"] for item in by_perturbation[name] if np.isfinite(item["mean_pcnt_mito"])),
             name,
         ),
     )
-    chosen_names = ranked_conditions[:conditions]
+    chosen_names: list[str] = []
+    for line in sorted(selected_lines):
+        line_candidates = [item for item in candidates if item["cell_line_id"] == line]
+        line_candidates.sort(key=lambda item: (
+            -item["treatment_sample_n"], -item["treatment_cell_n"],
+            -item["mean_gene_count"] if np.isfinite(item["mean_gene_count"]) else 0,
+            item["mean_pcnt_mito"] if np.isfinite(item["mean_pcnt_mito"]) else float("inf"),
+            item["perturbation_condition"],
+        ))
+        if line_candidates and line_candidates[0]["perturbation_condition"] not in chosen_names:
+            chosen_names.append(line_candidates[0]["perturbation_condition"])
+    for name in ranked_conditions:
+        if len(chosen_names) >= conditions:
+            break
+        if name not in chosen_names:
+            chosen_names.append(name)
     if len(chosen_names) < 3:
         raise ValueError(f"only {len(chosen_names)} unique perturbation conditions qualify")
     selected = [
