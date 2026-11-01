@@ -262,7 +262,9 @@ def validate_graph_export(
                 kind = str(attrs.get("kind", ""))
                 if not kind:
                     errors.append(f"{graphml.name}: node {node_id!r} has no kind")
-            for left, right, _, attrs in graph.edges(keys=True, data=True):
+            graph_edges = (graph.edges(keys=True, data=True) if graph.is_multigraph()
+                           else ((left, right, None, attrs) for left, right, attrs in graph.edges(data=True)))
+            for left, right, _, attrs in graph_edges:
                 if not attrs.get("kind"):
                     errors.append(f"{graphml.name}: edge ({left!r}, {right!r}) has no kind")
                 if not attrs.get("evidence"):
