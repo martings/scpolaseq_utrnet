@@ -61,10 +61,15 @@ def test_contract_export_is_repeatable_and_keeps_raw_ambiguity(tmp_path: Path):
     built = build_gene_graphs(config)
     legacy = built["directory"]
     second = tmp_path / "second-bundle"
-    report = export_graph_contract(legacy, output_directory=second)
+    first = legacy / BUNDLE_DIRECTORY
+    first_manifest = json.loads((first / "graph_contract.json").read_text())
+    report = export_graph_contract(
+        legacy,
+        output_directory=second,
+        generation_config=first_manifest["generation_config"],
+    )
     assert report.valid, report.errors
 
-    first = legacy / BUNDLE_DIRECTORY
     for rel in ("apa_profiles.csv", "pas_sites.csv", "utr_isoforms.csv", "regulatory_sites.csv",
                 "regulator_abundance.csv", "interaction_scores.csv", "graph_contract.json",
                 "apa_metric_registry.json"):
