@@ -40,7 +40,7 @@ All other columns are retained. Optional `pas_sites.csv`, CPA tables and evidenc
 - Empty values remain missing; measured zeros remain zero. Coverage, accessibility, abundance, unresolved models and score statuses survive the copy.
 - Provider ambiguity values `ambiguous_sequence_models` and `same_sequence_multiple_transcripts` map to `ambiguous_multiple_models` in the bundle, with originals retained in `source_ambiguity_status`. `unique` and `no_compatible_3utr_model` remain explicit.
 - Relationship categories distinguish gene→PAS, PAS→isoform, isoform→region, region→regulator, regulator→gene, population→expression/usage, and optional CPA edges.
-- `apa_metric_registry.json` ships with the bundle. `si`, magnetization, entropy and legacy deltas are preserved, but pending/ambiguous records are not eligible for new directional biological claims.
+- `apa_metric_registry.json` ships with the bundle. It records canonical SI and proximal PAS fraction from the maintainer-confirmed UTRNNet definitions, plus audited fixed-basis genomic magnetization and entropy formulas. The downstream implementation writes both pairwise deltas as group A − group B and records both group labels. Existing values are never sign-inverted. Historical tables without artifact-level implementation/order provenance remain gated. See [the APA metric audit](contracts/APA_METRIC_REGISTRY.md).
 
 ## How Gemini can consume it
 
@@ -58,6 +58,6 @@ The provider branch does not execute UTRNNet or modify its active feature branch
 
 ## Unresolved metric semantics and limitations
 
-The cited thesis formula associates higher multisite SI with more distal usage when PAS order is proximal-to-distal. This provider has not migrated historical dataset definitions or contrast group order, so `si` stays `definition_pending_migration` and cannot drive validated shortening/lengthening claims. Genomic magnetization, entropy variants and differential APA fields also remain pending or ambiguous. The active downstream metric audit is the authority for a future migration.
+The local audit compared `scPolASeq_downstream/src/scpolaseq_downstream/apa.py` at `365c0722758f7d3a08e9a06050c974207374cfe0` with the maintainer-confirmed UTRNNet metric definitions. It did not edit or execute the downstream checkout. SI, fixed-basis genomic magnetization, and entropy definitions are verified for that implementation; the support threshold and fixed-basis scope are part of the semantics. Existing legacy deltas are preserved as group A − group B, with no sign changes. Older tables still require artifact-level provenance. The authoritative UTRNNet schema version can be ingested when its owner publishes it.
 
 The provider bundle is a biological graph evidence export, not a Tahoe matrix and not a PyTorch dataset. It does not add timepoints, gene perturbations, measured miRNA abundance, unsupported pathway activity, or causal target claims. Non-present modalities remain explicit in `regulatory-signature/v0.1`.

@@ -26,7 +26,11 @@ Compatibility gaps found and addressed in the provider bundle:
 
 ## APA metric compatibility risk
 
-`make_profiles` computes PAS UMI proportions and pooled-UMI Jeffreys/Dirichlet intervals. It also imports legacy `si`, magnetization and entropy fields from downstream outputs. The upstream SI reference supplied for this task describes a proximal-to-distal ranked formula, but the active downstream audit has not reconciled historical implementations and contrast group order. The registry records this formula as a reference only and gates new direction claims until migration is verified. No imported numeric value is renamed, rewritten or dropped.
+`make_profiles` computes PAS UMI proportions and pooled-UMI Jeffreys/Dirichlet intervals. It also imports legacy `si`, magnetization and entropy fields from downstream outputs. The maintainer-confirmed UTRNNet registry defines canonical SI as `sum_i p_i * (i-1)/(N-1)`, with proximal = 0 and distal = 1. I audited `scPolASeq_downstream/src/scpolaseq_downstream/apa.py` at commit `365c0722758f7d3a08e9a06050c974207374cfe0`: the formula and orientation match.
+
+The audited implementation filters each group's PAS by `min_umi_per_site` before ranking; defaults are 5 UMIs/site, 2 passing sites/gene, and 10 total UMIs/gene. SI then uses group-specific ranks on that passing set. Its pairwise `delta_si` is `si_a - si_b`, with `group_a` and `group_b` written to each row. `delta_m_genomic_fixed` is likewise `m_genomic_fixed_a - m_genomic_fixed_b`. No sign flip or historical table rewrite is part of this PR. Older tables remain gated unless their producing implementation and group order are known.
+
+The fixed-basis genomic metric maps strand-aware PAS order to [−1,1]. Per-group `magnetization_genomic` uses a gene-wide passing-site coordinate span; the pairwise `m_genomic_fixed_a/b` fields use the union of passing sites for that pair, so the values can differ when support sets differ. `magnetization_rank` is `2*SI−1`. `entropy` is Shannon entropy in bits over passing PAS; `entropy_norm` divides by `log2(max(2, n_sites_pass))`. Proximal PAS fraction `p_proximal` is a UTRNNet-defined derived metric, but the audited downstream tables do not emit it as a standalone field. The full definitions and this source-vs-history distinction are in [the APA registry](contracts/APA_METRIC_REGISTRY.md).
 
 ## Backward compatibility and remaining limits
 

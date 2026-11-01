@@ -33,8 +33,7 @@ def test_three_or_more_pas_preserve_strand_aware_rank_order():
 def test_explicit_contrast_orientation_handles_positive_and_negative_delta():
     assert contrast_delta("pas_usage_proportion", 0.2, 0.8) == pytest.approx(0.6)
     assert contrast_delta("pas_usage_proportion", 0.8, 0.2) == pytest.approx(-0.6)
-    with pytest.raises(ValueError, match="not cleared"):
-        contrast_delta("multisite_shortening_index", 0.2, 0.8)
+    assert contrast_delta("multisite_shortening_index", 0.2, 0.8) == pytest.approx(0.6)
 
 
 def test_legacy_metric_values_are_gated_without_renaming_or_rewriting():
@@ -42,10 +41,15 @@ def test_legacy_metric_values_are_gated_without_renaming_or_rewriting():
     assert entry is not None
     assert entry["metric_id"] == "multisite_shortening_index"
     assert entry["source_field"] == "si"
-    assert entry["compatibility_status"] == "definition_pending_migration"
-    assert not interpretation_allowed(entry["metric_id"])
+    assert entry["compatibility_status"] == "definition_verified"
+    assert interpretation_allowed(entry["metric_id"])
     assert legacy_metric_definition("unknown_apa_field") is None
-    assert metric_definition("fixed_basis_genomic_magnetization")["orientation"] == "unknown"
+    fixed = metric_definition("fixed_basis_genomic_magnetization")
+    assert fixed["orientation"] == "distal_high_proximal_low"
+    assert fixed["range"] == [-1.0, 1.0]
+    proximal = metric_definition("proximal_pas_fraction")
+    assert proximal["orientation"] == "proximal_high_distal_low; 1=proximal"
+    assert not interpretation_allowed("differential_apa_statistic")
 
 
 def test_pas_order_requires_explicit_single_strand_and_missing_site_fields():

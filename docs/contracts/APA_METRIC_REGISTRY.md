@@ -11,21 +11,23 @@ Allowed statuses are `definition_verified`, `definition_ambiguous`, and `definit
 | Metric ID | Source field | Definition / orientation | Status |
 | --- | --- | --- | --- |
 | `pas_usage_proportion` | `pas_proportion` | `umi_sum / total_gene_umi`; higher means more usage of that PAS; [0,1] | verified |
-| `multisite_shortening_index` | `si` | Reference formula: `sum_i p_i * (i-1)/(N-1)` with PAS proximal-to-distal; referenced orientation is higher = more distal usage | pending migration |
-| `proximal_pas_usage` | not a distinct provider field | Requires verified strand-aware proximal PAS selection; higher = more proximal usage | pending migration |
+| `multisite_shortening_index` | `si` | Canonical `sum_i p_i * (i-1)/(N-1)`; proximal = 0, distal = 1; higher = more distal usage | verified against UTRNNet registry and audited downstream code |
+| `proximal_pas_fraction` | derived `p_proximal` | Fraction assigned to the first PAS in strand-aware proximal-to-distal order; 1 = proximal | definition verified; no standalone downstream output field |
 | `rank_weighted_usage_variant` | not a distinct provider field | Formula and normalization unresolved | ambiguous |
-| `fixed_basis_genomic_magnetization` | `magnetization_genomic` | Legacy fixed-basis value preserved; orientation and basis unresolved | pending migration |
-| `apa_entropy` | `entropy` | Log base, support and normalization unresolved | ambiguous |
-| `normalized_apa_entropy` | `entropy_normalized` | Denominator and PAS support unresolved | pending migration |
-| `differential_apa_statistic` | `delta_si`, `delta_m_genomic_fixed`, `adj_p_value` | Preserve source group order and statistic; no default direction | pending migration |
+| `fixed_basis_genomic_magnetization` | `magnetization_genomic`, `m_genomic_fixed_a/b`, `delta_m_genomic_fixed` | Strand-aware coordinate weighting on a declared basis; [−1,1], proximal-low/distal-high | verified for audited implementation; basis scope recorded |
+| `apa_entropy` | `entropy` | Shannon `−sum p_i log2(p_i)` over PAS passing the configured support threshold; bits | verified for audited implementation |
+| `normalized_apa_entropy` | `entropy_norm` | Shannon entropy / `log2(max(2, n_sites_pass))` | verified for audited implementation |
+| `differential_apa_statistic` | `delta_si`, `delta_m_genomic_fixed`, `adj_p_value` | Audited `apa.py` stores group A − group B; older tables remain source-specific | pending artifact-level migration |
 | `pooled_umi_usage_interval` | `usage_ci_low`, `usage_ci_high` | Jeffreys/Dirichlet marginal interval over pooled PAS UMIs; not biological-replicate uncertainty | verified |
 
 ## Strand, order and contrast handling
 
-`order_pas_by_proximity` only orders explicit PAS coordinates on one explicit strand: ascending coordinate on `+`, descending on `-`. It does not calculate SI, change historical ranks, or make imported metric values authoritative. Tests cover two PAS and three-PAS ordering on each strand.
+`order_pas_by_proximity` only orders explicit PAS coordinates on one explicit strand: ascending coordinate on `+`, descending on `-`. The audited downstream `compute_si_and_magnetization` uses the canonical SI formula over PAS meeting the configured per-site UMI threshold (defaults: 5 UMIs/site, 2 passing sites/gene, 10 total UMIs/gene). Thus the support set is part of provenance. The separate `p_proximal` metric is derivable from the first strand-aware PAS and its declared usage denominator, but the audited downstream tables do not emit a standalone column for it. Tests cover two PAS and three-PAS ordering on each strand.
 
-`contrast_delta` returns `group_b - group_a` only for registry entries explicitly verified with that contrast convention. It rejects legacy SI and magnetization until group ordering and historical direction are reconciled. A negative contrast therefore means only that the supplied B value is numerically lower; biological shortening/lengthening is not inferred for pending metrics.
+`contrast_delta` returns `group_b - group_a` for verified values when the caller explicitly supplies that order. The audited downstream fields `delta_si` and `delta_m_genomic_fixed` instead store group A − group B; both labels are present in the table. Their existing values are preserved. For those rows, a negative `delta_si` means A has a lower canonical SI (more proximal usage) than B. Historical tables without matching implementation/provenance remain gated and are never sign-inverted.
+
+The fixed-basis genomic metric maps strand-aware PAS coordinates to [−1,1]. The per-group `magnetization_genomic` uses a gene-wide reference span across passing sites, while pairwise `m_genomic_fixed_a/b` uses the union of passing PAS from that pair. Those columns are related but not interchangeable when the bases differ. The rank magnetization in the audited implementation is `2*SI−1`. Shannon entropy and its normalization are verified from the code, but neither is a shortening direction metric.
 
 ## Migration path
 
-When the downstream audit publishes an authoritative definition, update the relevant registry entries with its source field, exact implementation version, range and contrast order. Mark the entry `definition_verified` only after fixture comparisons against the audited implementation pass. Keep original fields and provenance in backward-compatible exports. Do not overwrite existing PBMC exploratory reports during migration.
+The local audit compared the registry against `scPolASeq_downstream@365c0722758f7d3a08e9a06050c974207374cfe0` and the UTRNNet metric declarations provided by its maintainer. This registry records those semantics without importing the downstream schema or changing any historical values. Older output tables still require artifact-level implementation and group-order provenance before directional interpretation. The authoritative UTRNNet schema version can be ingested when it is published. Do not overwrite existing PBMC exploratory reports during migration.
