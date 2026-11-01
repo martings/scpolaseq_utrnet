@@ -12,6 +12,7 @@ from .pipeline import build_gene_graphs
 from .graphs import compare_populations
 from .sensitivity import plan, PARAMETERS, graph_sweep
 from .visualization import render_gene
+from .graph_contract import export_graph_contract, validate_graph_export
 
 
 def _gene_directory(config) -> Path:
@@ -46,7 +47,25 @@ def main(argv: list[str] | None = None) -> int:
     traj_item.add_argument("--config", required=True)
     traj_item.add_argument("--gene", help="gene symbol or Ensembl base ID")
     traj_item.add_argument("--order", nargs="+", required=True, help="ordered list of population states")
+    export_item = sub.add_parser("export-contract", help="validate and export a stable utrnet-graph/v0.1 bundle")
+    export_item.add_argument("--directory", required=True, help="existing gene output directory")
+    export_item.add_argument("--output", help="bundle output directory; defaults inside the gene directory")
+    validate_item = sub.add_parser("validate-contract", help="validate an existing graph directory or contract bundle")
+    validate_item.add_argument("--directory", required=True)
     args = parser.parse_args(argv)
+    if args.command == "export-contract":
+        report = export_graph_contract(args.directory, output_directory=args.output)
+        print(json.dumps({"valid": report.valid, "contract_version": report.contract_version,
+                          "bundle_path": report.bundle_path, "errors": report.errors,
+                          "warnings": report.warnings}, indent=2))
+        return 0 if report.valid else 1
+    if args.command == "validate-contract":
+        report = validate_graph_export(args.directory, require_manifest=True)
+        print(json.dumps({"valid": report.valid, "contract_version": report.contract_version,
+                          "bundle_path": report.bundle_path, "present_tables": report.present_tables,
+                          "row_counts": report.row_counts, "errors": report.errors,
+                          "warnings": report.warnings}, indent=2))
+        return 0 if report.valid else 1
     config = load_config(args.config)
     if getattr(args, "gene", None):
         from dataclasses import replace

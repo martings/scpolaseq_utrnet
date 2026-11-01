@@ -35,6 +35,18 @@ python -m pytest -q
 
 The fixture contains two cells, two strands, exact barcodes with `-1` suffixes, a synthetic 3′UTR motif retained only in a distal isoform, and a prior-only miRNA site. It is synthetic and makes no biological claim.
 
+## Stable graph and regulatory-signature contracts
+
+Each `build-graph` run now keeps its existing root-level outputs and adds a portable `utrnet-graph-v0.1/` bundle with a versioned manifest, sorted CSV tables, entity inventory, relationship and missingness summaries, metric registry, file checksums, provenance and copies of the graph files. Validate it with:
+
+```bash
+utrnet validate-contract --directory outputs/pbmc1k/ENSG00000130066/utrnet-graph-v0.1
+```
+
+Existing output directories can be exported without rebuilding the graph by using `utrnet export-contract --directory PATH`. The bundle fields, ambiguity mapping, metrics, and handoff notes are documented in [the graph contract](docs/contracts/UTRNET_GRAPH_V0_1.md), [the APA metric registry](docs/contracts/APA_METRIC_REGISTRY.md), and [the UTRNNet handoff](docs/HANDOFF_TO_UTRNNET.md).
+
+`regulatory-signature/v0.1` is a separate, generic JSON evidence format. It supports open biological contexts and multiple modalities while distinguishing measured zero from unmeasured or zero-coverage values. See [its schema and guide](docs/contracts/REGULATORY_SIGNATURE_V0_1.md) and the synthetic PBMC and adipocyte examples in `examples/`.
+
 ## Evidence and interpretation
 
 Observed: Sierra UMI counts, curated cell identities, and mRNA expression. Annotation-derived: candidate transcript/PAS associations and reconstructed 3′UTR sequences. External experimental evidence: ATtRACT's ELAVL1 and ZFP36 AUUUA motif records from other contexts. Predicted: matches of those motifs and MirGeneDB-derived exact miRNA seeds to SAT1 isoforms, plus interaction scores. Missing by default: RNAplfold accessibility if the executable is absent, measured RBP/AGO occupancy at SAT1 in PBMC, and endogenous miRNA abundance. The optional miRNA genomic-site import uses a versioned TSV; both miRNA evidence modes remain prior-only without small-RNA measurements.

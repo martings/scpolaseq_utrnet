@@ -16,6 +16,7 @@ from .folding import annotate_accessibility, common_region_accessibility
 from .regulators import regulator_abundance
 from .graphs import score_interactions, compare_populations, export_graphs, site_retention, population_metrics
 from .cpa import extract_cpa_expression, correlate_cpa_with_apa, build_cpa_regulatory_edges
+from .graph_contract import export_graph_contract
 
 
 def _fingerprint(path: Path) -> dict:
@@ -102,6 +103,17 @@ def build_gene_graphs(config: Config) -> dict[str, Path]:
                 "limitations": ["single biological sampling context", "interaction scores are predictions, not occupancy",
                                 "miRNA abundance is unmeasured without small-RNA input",
                                 "unresolved or ambiguous transcript/PAS associations remain flagged"]}
-    (directory / "provenance.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    (directory / "provenance.json").write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
+    contract_report = export_graph_contract(
+        directory,
+        generation_config={
+            "sample_id": config.sample_id,
+            "gene": config.gene,
+            "min_population_cells": config.min_population_cells,
+            "max_utr_span": config.max_utr_span,
+            "folding_parameters": metadata["folding_parameters"],
+        },
+    )
     return {"directory": directory, "scores": directory / "interaction_scores.csv",
-            "graphs": directory / "graphs"}
+            "graphs": directory / "graphs", "contract": directory / "utrnet-graph-v0.1",
+            "contract_valid": contract_report.valid}

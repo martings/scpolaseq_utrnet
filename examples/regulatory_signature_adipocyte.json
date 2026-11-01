@@ -1,0 +1,76 @@
+{
+  "schema_version": "regulatory-signature/v0.1",
+  "dataset": {
+    "dataset_id": "synthetic:adipocyte-development-demo",
+    "source_repository": null,
+    "source_commit": null,
+    "species": "Mus musculus",
+    "reference_genome": "GRCm39"
+  },
+  "context_schema": {
+    "description": "Non-immune tissue example with a physical timepoint and flexible study-specific fields.",
+    "fields": ["organ", "developmental_stage", "culture_condition", "timepoint", "assay_batch"]
+  },
+  "observations": [
+    {
+      "observation_id": "obs:adipo:day0",
+      "biological_replicate_id": "animal-01",
+      "sample_id": "adipose-day0",
+      "library_id": "rna-library-day0",
+      "timepoint": {"value": 0, "unit": "day", "kind": "physical"},
+      "context": {"organ": "adipose_tissue", "developmental_stage": "precursor", "culture_condition": "baseline", "assay_batch": "batch-1"}
+    },
+    {
+      "observation_id": "obs:adipo:day7",
+      "biological_replicate_id": "animal-01",
+      "sample_id": "adipose-day7",
+      "library_id": "rna-library-day7",
+      "timepoint": {"value": 7, "unit": "day", "kind": "physical"},
+      "context": {"organ": "adipose_tissue", "developmental_stage": "differentiated", "culture_condition": "induction", "assay_batch": "batch-1"}
+    }
+  ],
+  "modalities": {
+    "gene_expression": {"status": "measured", "measurement_scale": "raw_UMI", "normalization": "none", "observation_unit": "cell"},
+    "pas_usage": {"status": "partially_measured", "measurement_scale": "pooled_UMI_proportion", "normalization": "gene_total_UMI", "observation_unit": "population"},
+    "proteomics": {"status": "not_measured", "measurement_scale": null, "normalization": null, "observation_unit": null},
+    "chromatin_accessibility": {"status": "not_measured", "measurement_scale": null, "normalization": null, "observation_unit": null}
+  },
+  "measurements": [
+    {
+      "measurement_id": "expr:ENSMUSG00000000001:day7",
+      "feature_class": "gene_expression",
+      "feature_id": "ENSMUSG00000000001",
+      "entity_id": "gene:ENSMUSG00000000001",
+      "observation_id": "obs:adipo:day7",
+      "value": 0,
+      "unit": "UMI",
+      "measurement_scale": "raw_UMI",
+      "normalization": "none",
+      "status": "measured",
+      "source": {"table": "synthetic_expression", "version": "1"}
+    },
+    {
+      "measurement_id": "apa:pas-zero-coverage:day0",
+      "feature_class": "pas_usage",
+      "feature_id": "pas-zero-coverage",
+      "entity_id": "pas:pas-zero-coverage",
+      "observation_id": "obs:adipo:day0",
+      "value": null,
+      "unit": "proportion",
+      "status": "missing_zero_coverage",
+      "coverage": 0,
+      "source": {"table": "synthetic_apa_profiles", "version": "1"}
+    },
+    {
+      "measurement_id": "reg:availability:unknown",
+      "feature_class": "regulatory_region_availability",
+      "feature_id": "region-unresolved",
+      "entity_id": "regulatory_region:region-unresolved",
+      "observation_id": "obs:adipo:day7",
+      "value": null,
+      "status": "ambiguous",
+      "ambiguity_status": "no_compatible_3utr_model",
+      "source": {"table": "synthetic_isoform_models", "version": "1"}
+    }
+  ]
+}
