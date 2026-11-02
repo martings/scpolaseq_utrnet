@@ -298,8 +298,8 @@ def _validate_csv_tables(directory: Path, *, check_manifest: bool) -> tuple[list
                 if not isinstance(categories, list) or set(categories) != EVIDENCE_CATEGORIES:
                     errors.append("graph_contract.json evidence_categories do not match the canonical vocabulary")
                 relationship_categories = manifest.get("relationship_categories", {})
-                if not isinstance(relationship_categories, dict) or not set(relationship_categories.values()) <= EVIDENCE_CATEGORIES:
-                    errors.append("graph_contract.json relationship_categories contain an unadvertised category")
+                if relationship_categories != RELATIONSHIP_CATEGORIES:
+                    errors.append("graph_contract.json relationship_categories do not match the canonical declarations")
             except Exception as exc:
                 errors.append(f"cannot validate graph_contract.json: {exc}")
     return sorted(set(present)), counts, errors, warnings
@@ -352,7 +352,9 @@ def validate_graph_export(
             metric_compatibility = str(manifest.get("metric_compatibility", {}).get("status", "not_declared"))
             if isinstance(snapshot, dict):
                 current = _source_snapshot(source)
-                source_consistency = "current" if current == {
+                source_consistency = "current" if {
+                    name: value.get("sha256") for name, value in current.items()
+                } == {
                     name: value.get("sha256") for name, value in snapshot.items()
                 } else "stale"
                 if source_consistency == "stale":
