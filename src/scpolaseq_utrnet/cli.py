@@ -57,14 +57,18 @@ def main(argv: list[str] | None = None) -> int:
         report = export_graph_contract(args.directory, output_directory=args.output)
         print(json.dumps({"valid": report.valid, "contract_version": report.contract_version,
                           "bundle_path": report.bundle_path, "errors": report.errors,
-                          "warnings": report.warnings}, indent=2))
+                          "warnings": report.warnings, "bundle_integrity": report.bundle_integrity,
+                          "source_consistency": report.source_consistency,
+                          "metric_compatibility": report.metric_compatibility}, indent=2))
         return 0 if report.valid else 1
     if args.command == "validate-contract":
         report = validate_graph_export(args.directory, require_manifest=True)
         print(json.dumps({"valid": report.valid, "contract_version": report.contract_version,
                           "bundle_path": report.bundle_path, "present_tables": report.present_tables,
                           "row_counts": report.row_counts, "errors": report.errors,
-                          "warnings": report.warnings}, indent=2))
+                          "warnings": report.warnings, "bundle_integrity": report.bundle_integrity,
+                          "source_consistency": report.source_consistency,
+                          "metric_compatibility": report.metric_compatibility}, indent=2))
         return 0 if report.valid else 1
     config = load_config(args.config)
     if getattr(args, "gene", None):

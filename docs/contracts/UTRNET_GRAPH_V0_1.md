@@ -8,7 +8,7 @@ This is a framework-independent output contract for biological regulatory graph 
 
 `utrnet export-contract --directory <gene-output>` writes a deterministic bundle under `<gene-output>/utrnet-graph-v0.1/`. The bundle contains `graph_contract.json`, `apa_metric_registry.json`, copied CSV tables, `provenance.json` when present, and copied per-population GraphML/Cytoscape files under `graphs/`.
 
-The manifest records the contract version, provider and repository, source commit when available, source input provenance and hashes, sample/gene context, reference file paths where available, generation configuration, evidence sources, typed relationship categories, canonical entity IDs, file sizes and SHA-256 hashes. Unknown species or genome release stays null.
+The manifest records the contract version, provider and repository, source commit when available, source input provenance and hashes, sample/gene context, reference file paths where available, resolved generation configuration, evidence sources, typed relationship categories, canonical entity IDs, file sizes and SHA-256 hashes. Its source_snapshot records exact hashes of the CSV, provenance and graph files copied from the legacy output. Unknown species or genome release stays null.
 
 Canonical IDs use `<type>:<percent-encoded-source-id>`; for example `gene:ENSG00000130066`, `population:Mono`, `pas:site%3A1`, `utr:utr%3Aref%3A1`, `region:utr%3Aref%3A1%3AARE%3A2`, and `regulator:ELAVL1`. Source IDs remain unchanged in CSV columns. IDs are sorted in the manifest so entity indexing does not depend on row order.
 
@@ -22,7 +22,7 @@ Canonical IDs use `<type>:<percent-encoded-source-id>`; for example `gene:ENSG00
 | `regulator_abundance.csv` | `population`, `regulator`, `mean_umi_per_cell` | Measured RBP mRNA where available; miRNA abundance can remain missing. |
 | `interaction_scores.csv` | `population`, `isoform_id`, `site_id`, `regulatory_site_id`, `regulator`, `regulator_class`, `model_weight`, `accessibility`, `evidence_factor`, `evidence_tier`, `abundance_factor`, `interaction_score`, `score_status` | Candidate scores, never experimental occupancy. |
 
-The validator enforces unique identity keys and cross-table references. Additional columns are allowed and retained.
+The validator enforces unique identity keys, pair and compound cross-table relationships, and exact required-file checksum inventory. Additional columns are allowed and retained.
 
 ## Optional tables
 
@@ -47,13 +47,17 @@ GraphML retains existing edge `kind`, `evidence`, score and status attributes. A
 
 ## Missingness and ambiguity
 
-- Empty/NaN values remain missing; measured numeric zero remains zero.
+- Raw numeric zeroes are retained. raw_numeric_zero does not claim a measured zero; placeholder_zero and zero_by_status expose score/coverage status, and confirmed_measured_zero is emitted only where observed UMI coverage supports that reading.
 - `coverage_status`, `score_status`, accessibility nulls and abundance nulls are not filled in the exported CSVs.
 - Contract-bundle `ambiguity_status` maps provider-only names to `unique`, `ambiguous_multiple_models`, or `no_compatible_3utr_model`; original values remain in `source_ambiguity_status`.
 - Missing miRNA measurements, no compatible 3′UTR model, zero coverage, and context-incompatible evidence must not be represented as measured zero or experimental support.
 
 ## Validation and serialization
 
-`utrnet validate-contract --directory <gene-output-or-bundle>` prints a machine-readable JSON report and exits nonzero on required-table, ID, cross-reference, checksum or GraphML errors. `utrnet export-contract` validates an existing legacy directory first, sorts copied CSV rows with stable keys, uses a deterministic manifest key order, and leaves the legacy outputs unchanged. Re-exporting the same source into a second empty destination produces byte-identical tables and manifest when source inputs are unchanged.
+`utrnet validate-contract --directory <gene-output-or-bundle>` prints a machine-readable JSON report and exits nonzero on required-table, ID, cross-reference, checksum or GraphML errors. The report separates bundle_integrity, source_consistency (current, stale, or unavailable) and declared metric_compatibility; a stale source does not invalidate an internally intact immutable bundle. Explicit bundle validation needs no source rerun.
+
+`utrnet export-contract` validates the exact legacy source directory before copying, even if an older bundle exists. It writes to a unique staging directory beside the destination and validates the complete staged bundle before publication. A new destination is published with a same-filesystem directory rename. Replacing an owned bundle uses two renames: the previous bundle is retained at a unique hidden backup path, then the validated stage is moved into place. The destination can be briefly absent between those operations; on a caught publication failure the prior bundle is restored. A process or host interruption in that interval leaves the previous complete bundle in the backup path. This is exception-safe preservation, not an atomic exchange of non-empty directories. Unowned directories and symlinked destination paths are refused. Staging cleanup is limited to the stage created by that export.
+
+The exporter sorts copied CSV rows with stable keys and uses deterministic manifest key order. Re-exporting unchanged inputs into a second empty destination produces byte-identical tables and manifest.
 
 The validator can check provider-side consistency and manifest hashes without importing `UTRNNet`, PyTorch or PyG. Gemini's separate adapter test remains its own integration gate.

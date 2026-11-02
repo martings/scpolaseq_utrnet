@@ -30,7 +30,7 @@ METRIC_REGISTRY: list[dict[str, Any]] = [
         "orientation": "distal_high_proximal_low; 0=proximal, 1=distal",
         "normalization_basis": "Within-group UMI proportions over PAS passing min_umi_per_site; ranks run proximal (0) to distal (N-1). Current downstream defaults: min_umi_per_site=5, min_sites_per_gene=2, min_total_umi_per_gene=10; configuration is per run.",
         "range": [0.0, 1.0],
-        "contrast_convention": "downstream delta_si is group_a minus group_b; groups are explicit. A newly requested contrast_delta uses its documented group_b minus group_a convention. Preserve legacy deltas verbatim.",
+        "contrast_convention": "historical downstream delta_si is group_a minus group_b; new contrasts require an explicit orientation and group labels. Preserve legacy deltas verbatim.",
         "source_implementation_version": "scPolASeq_downstream@365c0722758f7d3a08e9a06050c974207374cfe0 audited; older output provenance is dataset-specific",
         "data_availability": "si_and_magnetization_by_celltype.tsv::si; celltype_specific_APA_priority_table.tsv::si_a,si_b,delta_si",
         "compatibility_status": "definition_verified",
@@ -161,14 +161,33 @@ def interpretation_allowed(metric_id: str) -> bool:
                 and entry["orientation"] not in {"unknown", "source_defined; no default direction"})
 
 
-def contrast_delta(metric_id: str, group_a: float, group_b: float) -> float:
-    """Compute an explicitly registered group_b-minus-group_a contrast only."""
+def contrast_delta(metric_id: str, group_a: float, group_b: float, *, orientation: str) -> float:
+    """Compute a new contrast only when its group direction is explicitly supplied."""
     entry = metric_definition(metric_id)
     if not interpretation_allowed(metric_id):
         raise ValueError(f"metric {metric_id!r} is not cleared for new contrast interpretation")
-    if "group_b minus group_a" not in entry["contrast_convention"]:
-        raise ValueError(f"metric {metric_id!r} has no registered contrast convention")
-    return float(group_b) - float(group_a)
+    if orientation == "group_b_minus_group_a":
+        return float(group_b) - float(group_a)
+    if orientation == "group_a_minus_group_b":
+        return float(group_a) - float(group_b)
+    raise ValueError("orientation must be 'group_a_minus_group_b' or 'group_b_minus_group_a'")
+
+
+def contrast_record(
+    metric_id: str, group_a_label: str, group_a: float, group_b_label: str, group_b: float,
+    *, orientation: str, source_implementation: str,
+) -> dict[str, Any]:
+    """Return a machine-readable contrast with preserved labels and direction provenance."""
+    if not group_a_label or not group_b_label or not source_implementation:
+        raise ValueError("group labels and source_implementation are required")
+    return {
+        "metric_id": metric_id,
+        "group_a": {"label": group_a_label, "value": float(group_a)},
+        "group_b": {"label": group_b_label, "value": float(group_b)},
+        "delta": contrast_delta(metric_id, group_a, group_b, orientation=orientation),
+        "orientation": orientation,
+        "source_implementation": source_implementation,
+    }
 
 
 def order_pas_by_proximity(sites: Iterable[Mapping[str, Any]]) -> list[str]:

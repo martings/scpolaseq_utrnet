@@ -120,6 +120,30 @@ def test_correlate_cpa_with_apa():
     assert prox_edge.correlation_r == pytest.approx(-1.0)
 
 
+def test_empty_cpa_correlation_and_edge_frames_keep_headers():
+    correlations = correlate_cpa_with_apa(pd.DataFrame(), pd.DataFrame())
+    edges = build_cpa_regulatory_edges(correlations)
+    assert correlations.empty and "factor" in correlations.columns and "spearman_r" in correlations.columns
+    assert edges.empty and "source" in edges.columns and "correlation_r" in edges.columns
+
+
+def test_cpa_nonempty_input_with_no_variable_results_keeps_correlation_headers():
+    cpa_expr = pd.DataFrame([
+        {"population": pop, "factor": "F", "mean_expr": 1.0, "complex": "X",
+         "prior_effect": "unknown", "pmid": "1"}
+        for pop in ["A", "B", "C"]
+    ])
+    apa = pd.DataFrame([
+        {"celltype_corrected": pop, "site_id": "pas", "pas_proportion": 0.5,
+         "si": 0.5, "magnetization_genomic": 0.0}
+        for pop in ["A", "B", "C"]
+    ])
+    correlations = correlate_cpa_with_apa(cpa_expr, apa)
+    assert correlations.empty
+    assert {"factor", "target_type", "spearman_r"} <= set(correlations.columns)
+    assert build_cpa_regulatory_edges(correlations).columns.tolist()[0] == "source"
+
+
 def test_cpa_graph_integration(tmp_path: Path):
     config_path = make_fixture(tmp_path)
     config = load_config(config_path)

@@ -5,6 +5,7 @@ import pytest
 
 from scpolaseq_utrnet.metric_registry import (
     contrast_delta,
+    contrast_record,
     interpretation_allowed,
     legacy_metric_definition,
     metric_definition,
@@ -31,9 +32,26 @@ def test_three_or_more_pas_preserve_strand_aware_rank_order():
 
 
 def test_explicit_contrast_orientation_handles_positive_and_negative_delta():
-    assert contrast_delta("pas_usage_proportion", 0.2, 0.8) == pytest.approx(0.6)
-    assert contrast_delta("pas_usage_proportion", 0.8, 0.2) == pytest.approx(-0.6)
-    assert contrast_delta("multisite_shortening_index", 0.2, 0.8) == pytest.approx(0.6)
+    assert contrast_delta("pas_usage_proportion", 0.2, 0.8,
+                         orientation="group_b_minus_group_a") == pytest.approx(0.6)
+    assert contrast_delta("pas_usage_proportion", 0.8, 0.2,
+                         orientation="group_b_minus_group_a") == pytest.approx(-0.6)
+    assert contrast_delta("multisite_shortening_index", 0.2, 0.8,
+                         orientation="group_a_minus_group_b") == pytest.approx(-0.6)
+    record = contrast_record(
+        "pas_usage_proportion", "treated", 0.2, "control", 0.8,
+        orientation="group_a_minus_group_b", source_implementation="fixture-v1",
+    )
+    assert record["delta"] == pytest.approx(-0.6)
+    assert record["group_a"]["label"] == "treated"
+    assert record["orientation"] == "group_a_minus_group_b"
+
+
+def test_new_contrast_requires_supported_explicit_orientation():
+    with pytest.raises(TypeError, match="orientation"):
+        contrast_delta("pas_usage_proportion", 0.2, 0.8)
+    with pytest.raises(ValueError, match="orientation must"):
+        contrast_delta("pas_usage_proportion", 0.2, 0.8, orientation="legacy_unspecified")
 
 
 def test_legacy_metric_values_are_gated_without_renaming_or_rewriting():

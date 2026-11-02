@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from dataclasses import asdict
 from pathlib import Path
 import anndata as ad
 import pandas as pd
@@ -95,8 +96,13 @@ def build_gene_graphs(config: Config) -> dict[str, Path]:
         sources.append(config.apa_priority_table)
     if config.si_magnetization_table.exists():
         sources.append(config.si_magnetization_table)
+    resolved_config = {
+        key: str(value) if isinstance(value, Path) else value
+        for key, value in asdict(config).items()
+    }
     metadata = {"contract": "utrnet-input/v0.2", "model": "utrnet-v0.2",
                 "sample_id": config.sample_id, "gene_id": gene_id,
+                "generation_config": resolved_config,
                 "source_execution": str(config.upstream), "sources": [_fingerprint(p) for p in sources],
                 "folding_parameters": {"window": config.fold_window, "span": config.fold_span,
                                        "unpaired": config.fold_unpaired},
@@ -106,13 +112,7 @@ def build_gene_graphs(config: Config) -> dict[str, Path]:
     (directory / "provenance.json").write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
     contract_report = export_graph_contract(
         directory,
-        generation_config={
-            "sample_id": config.sample_id,
-            "gene": config.gene,
-            "min_population_cells": config.min_population_cells,
-            "max_utr_span": config.max_utr_span,
-            "folding_parameters": metadata["folding_parameters"],
-        },
+        generation_config=resolved_config,
     )
     return {"directory": directory, "scores": directory / "interaction_scores.csv",
             "graphs": directory / "graphs", "contract": directory / "utrnet-graph-v0.1",

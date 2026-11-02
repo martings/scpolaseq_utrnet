@@ -9,6 +9,15 @@ from scipy.stats import spearmanr, pearsonr
 
 logger = logging.getLogger(__name__)
 
+CPA_CORRELATION_COLUMNS = [
+    "factor", "complex", "target_type", "target_id", "spearman_r", "spearman_p",
+    "pearson_r", "pearson_p", "n_populations", "prior_effect", "concordant_with_prior", "pmid",
+]
+CPA_EDGE_COLUMNS = [
+    "source", "target", "kind", "factor", "complex", "target_type",
+    "target_id", "correlation_r", "p_value", "direction", "evidence_tier", "pmid",
+]
+
 # Curated catalog of 42 human Cleavage & Polyadenylation and Splicing-APA factors
 CPA_MACHINERY_CATALOG: list[dict[str, Any]] = [
     # CPSF Core (Cleavage and Polyadenylation Specificity Factor)
@@ -149,18 +158,12 @@ def correlate_cpa_with_apa(
 ) -> pd.DataFrame:
     """Correlate CPA factor expression across populations with APA metrics and PAS proportions."""
     if cpa_expr.empty or apa_profiles.empty:
-        return pd.DataFrame(columns=[
-            "factor", "complex", "target_type", "target_id", "spearman_r", "spearman_p",
-            "pearson_r", "pearson_p", "n_populations", "prior_effect", "concordant_with_prior", "pmid"
-        ])
+        return pd.DataFrame(columns=CPA_CORRELATION_COLUMNS)
 
     shared_pops = sorted(set(cpa_expr.population).intersection(set(apa_profiles.celltype_corrected)))
     if len(shared_pops) < 3:
         logger.warning("Fewer than 3 shared populations (%d) between CPA expression and APA profiles; correlations not reliable", len(shared_pops))
-        return pd.DataFrame(columns=[
-            "factor", "complex", "target_type", "target_id", "spearman_r", "spearman_p",
-            "pearson_r", "pearson_p", "n_populations", "prior_effect", "concordant_with_prior", "pmid"
-        ])
+        return pd.DataFrame(columns=CPA_CORRELATION_COLUMNS)
 
     records = []
 
@@ -244,7 +247,7 @@ def correlate_cpa_with_apa(
                     "prior_effect": prior_effect, "concordant_with_prior": None, "pmid": pmid,
                 })
 
-    return pd.DataFrame(records)
+    return pd.DataFrame(records, columns=CPA_CORRELATION_COLUMNS)
 
 
 def build_cpa_regulatory_edges(
@@ -254,10 +257,7 @@ def build_cpa_regulatory_edges(
 ) -> pd.DataFrame:
     """Filter significant CPA-to-APA correlations into candidate regulatory network edges."""
     if correlations.empty:
-        return pd.DataFrame(columns=[
-            "source", "target", "kind", "factor", "complex", "target_type",
-            "target_id", "correlation_r", "p_value", "direction", "evidence_tier", "pmid"
-        ])
+        return pd.DataFrame(columns=CPA_EDGE_COLUMNS)
 
     # Filter by correlation strength and significance
     sub = correlations[
@@ -294,4 +294,4 @@ def build_cpa_regulatory_edges(
             "pmid": str(row.pmid),
         })
 
-    return pd.DataFrame(records)
+    return pd.DataFrame(records, columns=CPA_EDGE_COLUMNS)

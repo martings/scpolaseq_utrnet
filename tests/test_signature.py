@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import math
 from pathlib import Path
+
+import pytest
 
 from scpolaseq_utrnet.signature import validate_regulatory_signature, write_regulatory_signature
 
@@ -53,3 +56,34 @@ def test_signature_rejects_unknown_observation_and_unprovenanced_measurement():
     errors = validate_regulatory_signature(payload)
     assert any("unknown observation_id" in error for error in errors)
     assert any("requires source provenance" in error for error in errors)
+
+
+@pytest.mark.parametrize("mutation", ["value", "modalities", "context"])
+def test_runtime_validation_enforces_published_schema(mutation):
+    payload = _fixture("regulatory_signature_pbmc.json")
+    if mutation == "value":
+        payload["measurements"][0].pop("value")
+    elif mutation == "modalities":
+        payload.pop("modalities")
+    else:
+        payload["observations"][0].pop("context")
+    errors = validate_regulatory_signature(payload)
+    assert any("JSON Schema" in error for error in errors)
+
+
+@pytest.mark.parametrize("nonfinite", [math.nan, math.inf, -math.inf])
+def test_nonfinite_nested_values_are_rejected_without_touching_existing_file(tmp_path: Path, nonfinite):
+    payload = _fixture("regulatory_signature_adipocyte.json")
+    payload["measurements"][0]["statistical_support"] = {"nested": [nonfinite]}
+    destination = tmp_path / "signature.json"
+    destination.write_text("previous complete artifact")
+    with pytest.raises(ValueError, match="non-finite"):
+        write_regulatory_signature(payload, destination)
+    assert destination.read_text() == "previous complete artifact"
+    assert sorted(path.name for path in tmp_path.iterdir()) == ["signature.json"]
+
+
+def test_packaged_and_published_json_schemas_are_identical():
+    published = json.loads((ROOT / "docs/contracts/regulatory-signature-v0.1.schema.json").read_text())
+    packaged = json.loads((ROOT / "src/scpolaseq_utrnet/schemas/regulatory-signature-v0.1.schema.json").read_text())
+    assert packaged == published
