@@ -13,9 +13,13 @@ dependencies = ["numpy>=1.24", "pandas>=2", "scipy>=1.10", "anndata>=0.10", "pys
 
 [project.optional-dependencies]
 test = ["pytest>=8"]
+tahoe = ["datasets>=3.0", "huggingface-hub>=0.25"]
+gnn = ["torch>=2"]
 
 [project.scripts]
 utrnet = "scpolaseq_utrnet.cli:main"
+utrnet-tahoe = "scpolaseq_utrnet.tahoe_cli:main"
+utrnet-tahoe-smoke = "scpolaseq_utrnet.tahoe_smoke:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
