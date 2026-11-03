@@ -1,0 +1,112 @@
+{
+  "schema_version": "regulatory-signature/v0.1",
+  "dataset": {
+    "dataset_id": "synthetic:pbmc-like-demo",
+    "source_repository": "martings/scpolaseq_utrnet",
+    "source_commit": "synthetic-fixture",
+    "species": "Homo sapiens",
+    "reference_genome": "GRCh38"
+  },
+  "context_schema": {
+    "description": "Flexible context fields; immune labels are example values, not required properties.",
+    "fields": ["tissue", "cell_state", "condition", "timepoint"]
+  },
+  "observations": [
+    {
+      "observation_id": "obs:pbmc:control",
+      "biological_replicate_id": "donor-A",
+      "sample_id": "sample-control",
+      "library_id": "library-control",
+      "context": {"tissue": "peripheral_blood", "cell_state": "monocyte_like", "condition": "control"}
+    },
+    {
+      "observation_id": "obs:pbmc:stimulated",
+      "biological_replicate_id": "donor-A",
+      "sample_id": "sample-stimulated",
+      "library_id": "library-stimulated",
+      "context": {"tissue": "peripheral_blood", "cell_state": "monocyte_like", "condition": "stimulated"}
+    }
+  ],
+  "modalities": {
+    "gene_expression": {"status": "measured", "measurement_scale": "raw_UMI", "normalization": "none", "observation_unit": "cell"},
+    "pas_usage": {"status": "measured", "measurement_scale": "pooled_UMI_proportion", "normalization": "gene_total_UMI", "observation_unit": "population"},
+    "regulatory_sequence_evidence": {"status": "partially_measured", "measurement_scale": "sequence_match_and_prior_score", "normalization": null, "observation_unit": "candidate_site"},
+    "small_rna": {"status": "not_measured", "measurement_scale": null, "normalization": null, "observation_unit": null},
+    "functional_programs": {"status": "partially_measured", "measurement_scale": "adjusted_p_value", "normalization": null, "observation_unit": "gene_set"}
+  },
+  "measurements": [
+    {
+      "measurement_id": "expr:ENSG00000130066:control",
+      "feature_class": "gene_expression",
+      "feature_id": "ENSG00000130066",
+      "entity_id": "gene:ENSG00000130066",
+      "observation_id": "obs:pbmc:control",
+      "value": 23,
+      "unit": "UMI",
+      "measurement_scale": "raw_UMI",
+      "normalization": "none",
+      "status": "measured",
+      "uncertainty": null,
+      "statistical_support": null,
+      "source": {"table": "synthetic_expression", "version": "1"}
+    },
+    {
+      "measurement_id": "apa:pas-1:control",
+      "feature_class": "pas_usage",
+      "feature_id": "pas-1",
+      "entity_id": "pas:pas-1",
+      "observation_id": "obs:pbmc:control",
+      "value": 0.72,
+      "unit": "proportion",
+      "measurement_scale": "pooled_UMI_proportion",
+      "normalization": "gene_total_UMI",
+      "status": "experimental_observation",
+      "uncertainty": {"type": "pooled_UMI_interval", "lower": 0.61, "upper": 0.81},
+      "statistical_support": null,
+      "source": {"table": "synthetic_apa_profiles", "version": "1"}
+    },
+    {
+      "measurement_id": "metric:si:control",
+      "feature_class": "apa_metric",
+      "feature_id": "multisite_shortening_index",
+      "entity_id": "gene:ENSG00000130066",
+      "observation_id": "obs:pbmc:control",
+      "metric_id": "multisite_shortening_index",
+      "source_field": "si",
+      "value": 0.62,
+      "unit": "index",
+      "status": "ambiguous",
+      "compatibility_status": "definition_pending_migration",
+      "directional_interpretation_allowed": false,
+      "source": {"table": "legacy_apa_metrics", "version": "unverified"}
+    },
+    {
+      "measurement_id": "candidate:ELAVL1:pas-1",
+      "feature_class": "regulatory_association",
+      "feature_id": "ELAVL1:pas-1",
+      "entity_id": "regulatory_region:region-1",
+      "observation_id": "obs:pbmc:control",
+      "value": 0.18,
+      "unit": "model_score",
+      "status": "candidate_inferred",
+      "evidence_tier": "motif_heuristic",
+      "source": {"database": "ATtRACT", "version": "fixture-only", "assay": null, "cell_context": "other_context"}
+    },
+    {
+      "measurement_id": "program:fixture:apa-enrichment",
+      "feature_class": "functional_enrichment",
+      "feature_id": "GO:0000000",
+      "entity_id": "program:GO:0000000",
+      "value": 0.03,
+      "unit": "adjusted_p_value",
+      "status": "experimental_observation",
+      "program_id": "GO:0000000",
+      "program_source": "Gene Ontology",
+      "program_version": "fixture-only",
+      "contributing_gene_ids": ["ENSG00000130066"],
+      "gene_universe_n": 100,
+      "statistical_support": {"p_adjusted": 0.03, "method": "upstream_result"},
+      "source": {"table": "upstream_functional_results", "version": "fixture-only"}
+    }
+  ]
+}

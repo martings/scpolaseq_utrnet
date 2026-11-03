@@ -21,6 +21,9 @@ from .graph_viz import (
     render_celltype_contrast_network,
     export_interactive_celltype_html,
 )
+from .graph_contract import export_graph_contract, validate_graph_export
+from .metric_registry import metric_definition, interpretation_allowed
+from .signature import validate_regulatory_signature, write_regulatory_signature
 
 __all__ = [
     "Config",
@@ -41,5 +44,11 @@ __all__ = [
     "compute_contrast_edge_set",
     "render_celltype_contrast_network",
     "export_interactive_celltype_html",
+    "export_graph_contract",
+    "validate_graph_export",
+    "metric_definition",
+    "interpretation_allowed",
+    "validate_regulatory_signature",
+    "write_regulatory_signature",
 ]
 __version__ = "0.2.2"

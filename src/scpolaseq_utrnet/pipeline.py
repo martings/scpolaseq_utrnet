@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from dataclasses import asdict
 from pathlib import Path
 import anndata as ad
 import pandas as pd
@@ -16,6 +17,7 @@ from .folding import annotate_accessibility, common_region_accessibility
 from .regulators import regulator_abundance
 from .graphs import score_interactions, compare_populations, export_graphs, site_retention, population_metrics
 from .cpa import extract_cpa_expression, correlate_cpa_with_apa, build_cpa_regulatory_edges
+from .graph_contract import export_graph_contract
 
 
 def _fingerprint(path: Path) -> dict:
@@ -94,14 +96,24 @@ def build_gene_graphs(config: Config) -> dict[str, Path]:
         sources.append(config.apa_priority_table)
     if config.si_magnetization_table.exists():
         sources.append(config.si_magnetization_table)
+    resolved_config = {
+        key: str(value) if isinstance(value, Path) else value
+        for key, value in asdict(config).items()
+    }
     metadata = {"contract": "utrnet-input/v0.2", "model": "utrnet-v0.2",
                 "sample_id": config.sample_id, "gene_id": gene_id,
+                "generation_config": resolved_config,
                 "source_execution": str(config.upstream), "sources": [_fingerprint(p) for p in sources],
                 "folding_parameters": {"window": config.fold_window, "span": config.fold_span,
                                        "unpaired": config.fold_unpaired},
                 "limitations": ["single biological sampling context", "interaction scores are predictions, not occupancy",
                                 "miRNA abundance is unmeasured without small-RNA input",
                                 "unresolved or ambiguous transcript/PAS associations remain flagged"]}
-    (directory / "provenance.json").write_text(json.dumps(metadata, indent=2) + "\n")
+    (directory / "provenance.json").write_text(json.dumps(metadata, indent=2, sort_keys=True) + "\n")
+    contract_report = export_graph_contract(
+        directory,
+        generation_config=resolved_config,
+    )
     return {"directory": directory, "scores": directory / "interaction_scores.csv",
-            "graphs": directory / "graphs"}
+            "graphs": directory / "graphs", "contract": directory / "utrnet-graph-v0.1",
+            "contract_valid": contract_report.valid}
