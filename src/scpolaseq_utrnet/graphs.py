@@ -192,9 +192,15 @@ def build_graph(scores: pd.DataFrame, profiles: pd.DataFrame, isoforms: pd.DataF
 
 
 def compare_populations(scores: pd.DataFrame, priority_df: pd.DataFrame | None = None) -> pd.DataFrame:
+    rewiring_columns = [
+        "population_a", "population_b", "regulator", "genomic_region", "score_a", "score_b",
+        "delta_score", "delta_ci_low", "delta_ci_high", "availability_change",
+    ]
+    priority_columns = [
+        "delta_m_genomic_fixed", "delta_si", "endpoint_artifact_suspect", "is_robust", "priority_score",
+    ]
     if scores.empty:
-        return pd.DataFrame(columns=["population_a", "population_b", "regulator", "genomic_region",
-                                     "score_a", "score_b", "delta_score", "availability_change"])
+        return pd.DataFrame(columns=rewiring_columns)
     summary = scores.groupby(["population", "regulator", "genomic_region"], as_index=False).agg(
         interaction_score=("interaction_score", "sum"),
         score_ci_low=("score_ci_low", "sum"), score_ci_high=("score_ci_high", "sum"),
@@ -241,7 +247,10 @@ def compare_populations(scores: pd.DataFrame, priority_df: pd.DataFrame | None =
                     rec["is_robust"] = getattr(prio_row, "is_robust", False)
                     rec["priority_score"] = getattr(prio_row, "priority_score", None)
                 records.append(rec)
-    return pd.DataFrame(records)
+    columns = rewiring_columns
+    if priority_df is not None and not priority_df.empty:
+        columns = [*columns, *priority_columns]
+    return pd.DataFrame(records, columns=columns)
 
 
 def export_graphs(scores: pd.DataFrame, profiles: pd.DataFrame, isoforms: pd.DataFrame,

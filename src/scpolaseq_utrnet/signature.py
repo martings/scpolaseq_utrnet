@@ -119,7 +119,7 @@ def validate_regulatory_signature(payload: dict[str, Any]) -> list[str]:
             errors.append(f"measurement {mid!r} references unknown observation_id")
         if not item.get("source") or not isinstance(item.get("source"), dict):
             errors.append(f"measurement {mid!r} requires source provenance")
-        if feature_class in {"functional_enrichment", "pathway_activity"}:
+        if isinstance(feature_class, str) and feature_class in {"functional_enrichment", "pathway_activity"}:
             if not item.get("program_id") or not item.get("program_source") or not item.get("program_version"):
                 errors.append(f"functional measurement {mid!r} requires program_id, program_source, and program_version")
             if feature_class == "functional_enrichment" and "gene_universe_n" not in item:

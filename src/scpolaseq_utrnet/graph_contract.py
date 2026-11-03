@@ -247,6 +247,14 @@ def _validate_csv_tables(directory: Path, *, check_manifest: bool) -> tuple[list
         site_gene = set(zip(isoforms.site_id, isoforms.gene_id))
         if not set(zip(profiles.site_id, profiles.gene_id)) <= site_gene:
             errors.append("apa_profiles.csv contains a site_id/gene_id pair absent from utr_isoforms.csv")
+        profile_population_site = set(zip(profiles.celltype_corrected, profiles.site_id))
+        score_population_site = set(zip(scores.population, scores.site_id))
+        if not score_population_site <= profile_population_site:
+            errors.append("interaction_scores.csv contains a population/site_id pair absent from apa_profiles.csv")
+        abundance_population_regulator = set(zip(abundance.population, abundance.regulator))
+        score_population_regulator = set(zip(scores.population, scores.regulator))
+        if not score_population_regulator <= abundance_population_regulator:
+            errors.append("interaction_scores.csv contains a population/regulator pair absent from regulator_abundance.csv")
         pas_frame = frames.get("pas_sites.csv")
         if pas_frame is not None and {"site_id", "gene_id"}.issubset(pas_frame.columns):
             pas_gene = set(zip(pas_frame.site_id, pas_frame.gene_id))
@@ -300,6 +308,16 @@ def _validate_csv_tables(directory: Path, *, check_manifest: bool) -> tuple[list
                 relationship_categories = manifest.get("relationship_categories", {})
                 if relationship_categories != RELATIONSHIP_CATEGORIES:
                     errors.append("graph_contract.json relationship_categories do not match the canonical declarations")
+                entities = manifest.get("entities")
+                if not isinstance(entities, dict):
+                    errors.append("graph_contract.json entities must be an object")
+                elif structurally_complete and entities != _entity_inventory(directory):
+                    errors.append("graph_contract.json entities do not match the bundled tables")
+                relationship_counts = manifest.get("relationship_counts")
+                if not isinstance(relationship_counts, dict):
+                    errors.append("graph_contract.json relationship_counts must be an object")
+                elif structurally_complete and relationship_counts != _relationship_counts(directory):
+                    errors.append("graph_contract.json relationship_counts do not match the bundled tables")
             except Exception as exc:
                 errors.append(f"cannot validate graph_contract.json: {exc}")
     return sorted(set(present)), counts, errors, warnings
@@ -314,7 +332,10 @@ def validate_graph_export(
 ) -> GraphValidationReport:
     """Validate a legacy export directory or a versioned contract bundle."""
     source = Path(directory)
-    bundle = source / BUNDLE_DIRECTORY if not exact_directory and (source / BUNDLE_DIRECTORY).is_dir() else None
+    child_bundle = source / BUNDLE_DIRECTORY if not exact_directory and (source / BUNDLE_DIRECTORY).is_dir() else None
+    direct_bundle = (source / "graph_contract.json").is_file()
+    bundle = child_bundle or (source if direct_bundle else None)
+    bundle_is_direct = direct_bundle and child_bundle is None
     target = bundle or source
     if not target.is_dir():
         report = GraphValidationReport(
@@ -350,7 +371,7 @@ def validate_graph_export(
             manifest = json.loads((bundle / "graph_contract.json").read_text(encoding="utf-8"))
             snapshot = manifest.get("source_snapshot")
             metric_compatibility = str(manifest.get("metric_compatibility", {}).get("status", "not_declared"))
-            if isinstance(snapshot, dict):
+            if isinstance(snapshot, dict) and not bundle_is_direct:
                 current = _source_snapshot(source)
                 source_consistency = "current" if {
                     name: value.get("sha256") for name, value in current.items()
@@ -359,9 +380,9 @@ def validate_graph_export(
                 } else "stale"
                 if source_consistency == "stale":
                     warnings.append("bundle is intact but source_snapshot differs from current source files")
-            elif bundle is not None:
+            else:
                 source_consistency = "unavailable"
-                warnings.append("bundle integrity is checked; source snapshot is unavailable")
+                warnings.append("bundle integrity is checked; source freshness cannot be assessed from the bundle directory")
         except (OSError, json.JSONDecodeError, AttributeError):
             source_consistency = "unavailable"
     bundle_integrity = "valid" if (require_manifest or bundle is not None) and not errors else (
@@ -412,6 +433,10 @@ def _entity_inventory(bundle: Path) -> dict[str, list[str]]:
         cpa = _read_csv(bundle / "cpa_expression.csv")
         if "factor" in cpa.columns:
             entities["cpa_factor"].update(canonical_entity_id("cpa", value) for value in cpa.factor)
+    if (bundle / "cpa_regulatory_edges.csv").is_file():
+        cpa_edges = _read_csv(bundle / "cpa_regulatory_edges.csv")
+        if "factor" in cpa_edges.columns:
+            entities["cpa_factor"].update(canonical_entity_id("cpa", value) for value in cpa_edges.factor)
     return {kind: sorted(values) for kind, values in sorted(entities.items())}
 
 
