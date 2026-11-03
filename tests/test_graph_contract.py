@@ -158,6 +158,24 @@ def test_compound_score_relationships_are_validated(tmp_path: Path):
     assert any("regulatory_site_id/isoform_id/site_id/regulator tuple" in error for error in report.errors)
 
 
+@pytest.mark.parametrize(
+    ("column", "value", "message"),
+    [
+        ("population", "unknown_population", "population/site_id pair absent from apa_profiles.csv"),
+        ("regulator", "unknown_regulator", "population/regulator pair absent from regulator_abundance.csv"),
+    ],
+)
+def test_score_population_joins_are_validated(tmp_path: Path, column, value, message):
+    legacy = _build_legacy(tmp_path)
+    scores_path = legacy / "interaction_scores.csv"
+    scores = pd.read_csv(scores_path, keep_default_na=False)
+    scores.loc[0, column] = value
+    scores.to_csv(scores_path, index=False)
+    report = validate_graph_export(legacy, exact_directory=True)
+    assert not report.valid
+    assert any(message in error for error in report.errors)
+
+
 def test_manifest_cannot_omit_required_file_hashes(tmp_path: Path):
     legacy = _build_legacy(tmp_path)
     bundle = legacy / BUNDLE_DIRECTORY
@@ -168,6 +186,68 @@ def test_manifest_cannot_omit_required_file_hashes(tmp_path: Path):
     report = validate_graph_export(bundle, require_manifest=True, exact_directory=True)
     assert not report.valid
     assert any("missing required file hashes" in error for error in report.errors)
+
+
+@pytest.mark.parametrize("field", ["entities", "relationship_counts"])
+def test_manifest_entity_metadata_is_required_and_derived_from_tables(tmp_path: Path, field):
+    legacy = _build_legacy(tmp_path)
+    bundle = legacy / BUNDLE_DIRECTORY
+    manifest_path = bundle / "graph_contract.json"
+    manifest = json.loads(manifest_path.read_text())
+    if field == "entities":
+        manifest.pop(field)
+    else:
+        manifest[field]["regulator_to_gene"] = -999
+    manifest_path.write_text(json.dumps(manifest))
+    report = validate_graph_export(bundle)
+    assert not report.valid
+    assert any(field in error for error in report.errors)
+
+
+def test_direct_bundle_path_checks_manifest_hashes_and_metric_registry(tmp_path: Path):
+    legacy = _build_legacy(tmp_path)
+    bundle = legacy / BUNDLE_DIRECTORY
+    report = validate_graph_export(bundle)
+    assert report.valid, report.errors
+    assert report.bundle_integrity == "valid"
+    assert report.metric_compatibility == "registry_declared"
+    profiles = bundle / "apa_profiles.csv"
+    profiles.write_text(profiles.read_text() + "\n")
+    damaged = validate_graph_export(bundle)
+    assert not damaged.valid
+    assert any("hash mismatch: apa_profiles.csv" in error for error in damaged.errors)
+
+
+def test_cpa_edge_factors_are_in_inventory_without_expression_table(tmp_path: Path):
+    legacy = _build_legacy(tmp_path)
+    (legacy / "cpa_expression.csv").unlink(missing_ok=True)
+    pd.DataFrame([{
+        "source": "cpa:CPSF1", "target": "gene:ENSGPLUS", "factor": "CPSF1",
+        "correlation_r": 0.5, "p_value": 0.01, "evidence_tier": "inferred_candidate",
+    }]).to_csv(legacy / "cpa_regulatory_edges.csv", index=False)
+    destination = tmp_path / "edge-only-bundle"
+    report = export_graph_contract(legacy, output_directory=destination)
+    assert report.valid, report.errors
+    manifest = json.loads((destination / "graph_contract.json").read_text())
+    assert "cpa:CPSF1" in manifest["entities"]["cpa_factor"]
+
+
+def test_single_population_build_writes_header_complete_rewiring(tmp_path: Path):
+    import anndata as ad
+
+    config_path = make_fixture(tmp_path)
+    config = load_config(config_path)
+    adata = ad.read_h5ad(config.curated_h5ad)
+    adata.obs["celltype_corrected"] = "A"
+    adata.write_h5ad(config.curated_h5ad)
+    built = build_gene_graphs(config)
+    scores = pd.read_csv(built["scores"])
+    rewiring_header = pd.read_csv(built["directory"] / "rewiring.csv", nrows=0).columns
+    assert scores.population.nunique() == 1
+    assert {
+        "population_a", "population_b", "regulator", "genomic_region", "score_a", "score_b",
+        "delta_score", "delta_ci_low", "delta_ci_high", "availability_change",
+    } <= set(rewiring_header)
 
 
 def test_stale_valid_bundle_does_not_validate_modified_source(tmp_path: Path):

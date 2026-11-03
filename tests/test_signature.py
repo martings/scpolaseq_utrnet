@@ -71,6 +71,15 @@ def test_runtime_validation_enforces_published_schema(mutation):
     assert any("JSON Schema" in error for error in errors)
 
 
+@pytest.mark.parametrize("feature_class", [[], {}])
+def test_invalid_feature_class_type_returns_schema_errors_without_crashing(feature_class):
+    payload = _fixture("regulatory_signature_pbmc.json")
+    payload["measurements"][0]["feature_class"] = feature_class
+    errors = validate_regulatory_signature(payload)
+    assert any("JSON Schema" in error for error in errors)
+    assert any("unknown feature_class" in error for error in errors)
+
+
 @pytest.mark.parametrize("nonfinite", [math.nan, math.inf, -math.inf])
 def test_nonfinite_nested_values_are_rejected_without_touching_existing_file(tmp_path: Path, nonfinite):
     payload = _fixture("regulatory_signature_adipocyte.json")
